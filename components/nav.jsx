@@ -147,7 +147,7 @@ const Navigation = () => {
                 {serviceTypes.map((service, index) => (
                   <Link 
                     key={index}
-                    href={`/services/${service}`} 
+                    href={`/${service}`} 
                     className="block px-4 py-2 hover:bg-gray-700 capitalize"
                   >
                     {service}
@@ -251,7 +251,7 @@ const Navigation = () => {
                 {serviceTypes.map((service, index) => (
                   <Link 
                     key={index}
-                    href={`/services/${service}`} 
+                    href={`/${service}`} 
                     className="block px-3 py-2 rounded-md hover:bg-gray-800 capitalize"
                   >
                     {service}
