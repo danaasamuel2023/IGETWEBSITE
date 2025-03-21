@@ -92,7 +92,10 @@ const Navigation = () => {
   // Bundle service types from schema
   const serviceTypes = [
    
-    'AfA-registration', 
+    'AfA-registration',
+    'mtn',  
+    'at-ishare', 
+    'telecel'
    
   ];
   
