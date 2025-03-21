@@ -7,7 +7,7 @@ const HomePage = () => {
     <div>
       
       <ServicesNetwork />
-      <OrderTrends />
+      {/* <OrderTrends /> */}
     </div>
   );
 };
