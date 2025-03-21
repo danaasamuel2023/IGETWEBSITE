@@ -129,7 +129,7 @@ const DashboardPage = () => {
               <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
                 <span className="text-white font-bold text-lg">ID</span>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Iget Dashboard</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Iget</h1>
             </div>
             <div className="flex items-center text-gray-600">
               <Calendar className="h-5 w-5 mr-2" />
