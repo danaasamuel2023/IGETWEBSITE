@@ -33,7 +33,7 @@ const DashboardPage = () => {
     try {
       setLoading(true);
       
-      const response = await fetch('http://localhost:5000/api/dashboard/today', {
+      const response = await fetch('https://iget.onrender.com/api/dashboard/today', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -127,9 +127,9 @@ const DashboardPage = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-lg">DH</span>
+                <span className="text-white font-bold text-lg">ID</span>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">DataHub Dashboard</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Iget Dashboard</h1>
             </div>
             <div className="flex items-center text-gray-600">
               <Calendar className="h-5 w-5 mr-2" />
