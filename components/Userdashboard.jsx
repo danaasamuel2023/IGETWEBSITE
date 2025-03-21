@@ -25,7 +25,7 @@ export default function TodayStats() {
         
         if (!token) {
           setError('Authentication token not found');
-          router.push('/login');
+          router.push('/Signin');
           return;
         }
         
