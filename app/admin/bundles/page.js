@@ -51,7 +51,7 @@ const BundleManagement = () => {
     setError('');
     try {
       const token = localStorage.getItem('igettoken');
-      const response = await axios.get(`http://localhost:5000/api/iget/bundle/${type}`, {
+      const response = await axios.get(`https://iget.onrender.com/api/iget/bundle/${type}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setBundles(response.data.data);
@@ -127,7 +127,7 @@ const BundleManagement = () => {
     
     try {
       const token = localStorage.getItem('igettoken');
-      await axios.put(`http://localhost:5000/api/iget/${id}`, bundleEdit, {
+      await axios.put(`https://iget.onrender.com/api/iget/${id}`, bundleEdit, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -168,7 +168,7 @@ const BundleManagement = () => {
     
     try {
       const token = localStorage.getItem('igettoken');
-      const response = await axios.put(`http://localhost:5000/api/iget/type/${selectedType}`, updateData, {
+      const response = await axios.put(`https://iget.onrender.com/api/iget/type/${selectedType}`, updateData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -197,7 +197,7 @@ const BundleManagement = () => {
     
     try {
       const token = localStorage.getItem('igettoken');
-      await axios.post('http://localhost:5000/api/iget/addbundle', newBundle, {
+      await axios.post('https://iget.onrender.com/api/iget/addbundle', newBundle, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -223,7 +223,7 @@ const BundleManagement = () => {
     
     try {
       const token = localStorage.getItem('igettoken');
-      await axios.delete(`http://localhost:5000/api/iget/${id}`, {
+      await axios.delete(`https://iget.onrender.com/api/iget/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

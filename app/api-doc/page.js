@@ -216,7 +216,7 @@ export default function ApiDocumentation() {
                 <h3 className="text-lg font-semibold mt-6 mb-3">Example Request</h3>
                 <div className="bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto">
                   <pre>
-{`curl -X POST https://api.iget.com/api/developer/orders/place \\
+{`curl -X POST https://iget.onrender.com/api/developer/orders/place \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: your_api_key_here" \\
   -d '{

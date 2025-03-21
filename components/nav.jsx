@@ -86,7 +86,7 @@ const Navigation = () => {
     localStorage.removeItem('userData');
     setUser(null);
     setBalance(null);
-    router.push('/login');
+    router.push('/Signin');
   };
 
   // Bundle service types from schema
@@ -196,7 +196,7 @@ const Navigation = () => {
           ) : (
             <>
               <Link href="/Signin" className="hover:text-gray-300 transition-colors">Login</Link>
-              <Link href="/register" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors">Register</Link>
+              <Link href="/Signin" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors">Register</Link>
             </>
           )}
         </div>

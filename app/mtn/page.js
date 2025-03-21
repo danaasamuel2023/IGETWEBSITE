@@ -91,7 +91,7 @@ const BundleFilter = () => {
       }
       
       const response = await axios.post(
-        'http://localhost:5000/api/orders/placeorder',
+        'https://iget.onrender.com/api/orders/placeorder',
         {
           recipientNumber,
           capacity: selectedBundle.capacity,

@@ -31,7 +31,7 @@ export default function UsersManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/admin/users', {
+      const response = await axios.get('https://iget.onrender.com/api/admin/users', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -90,7 +90,7 @@ export default function UsersManagement() {
 
   const handleDeleteUser = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/admin/users/${selectedUser._id}`, {
+      await axios.delete(`https://iget.onrender.com/api/admin/users/${selectedUser._id}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -105,7 +105,7 @@ export default function UsersManagement() {
 
   const handleToggleUserStatus = async () => {
     try {
-      const response = await axios.patch(`http://localhost:5000/api/admin/users/${selectedUser._id}/status`, {}, {
+      const response = await axios.patch(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/status`, {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -124,7 +124,7 @@ export default function UsersManagement() {
 
   const handleDeleteApiKey = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/admin/users/${selectedUser._id}/api-key`, {
+      await axios.delete(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/api-key`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -150,7 +150,7 @@ export default function UsersManagement() {
     }
     
     try {
-      const response = await axios.post(`http://localhost:5000/api/admin/users/${selectedUser._id}/wallet/deposit`, {
+      const response = await axios.post(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/wallet/deposit`, {
         amount: parseFloat(depositAmount),
         description: depositDescription
       }, {
@@ -175,7 +175,7 @@ export default function UsersManagement() {
 
   const handleChangeRole = async () => {
     try {
-      await axios.patch(`http://localhost:5000/api/admin/users/${selectedUser._id}/role`, {
+      await axios.patch(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/role`, {
         role: newRole
       }, {
         headers: {

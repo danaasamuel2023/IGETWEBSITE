@@ -16,7 +16,7 @@ const ATiShareBundleCards = () => {
     const fetchBundles = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('http://localhost:5000/api/iget/bundle');
+        const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
         // Filter for AT bundles only
         const atBundles = response.data.data.filter(bundle => 
           bundle.network === 'at' || bundle.type === 'AT-ishare');
@@ -81,7 +81,7 @@ const ATiShareBundleCards = () => {
     try {
       // Call the placeorder endpoint (same as in the MTN component)
       const response = await axios.post(
-        'http://localhost:5000/api/orders/placeorder',
+        'https://iget.onrender.com/api/orders/placeorder',
         {
           recipientNumber: phoneNumber,
           capacity: bundle.capacity,

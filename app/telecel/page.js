@@ -16,7 +16,7 @@ const TelecelBundleCards = () => {
     const fetchBundles = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('http://localhost:5000/api/iget/bundle');
+        const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
         // Filter for Telecel bundles only
         const telecelBundles = response.data.data.filter(bundle => 
           bundle.network === 'telecel' || bundle.type === 'Telecel-5959');

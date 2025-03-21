@@ -61,7 +61,7 @@ const AddBundlePage = () => {
 
       // Send request to create bundle
       const response = await axios.post(
-        'http://localhost:5000/api/iget/addbundle',
+        'https://iget.onrender.com/api/iget/addbundle',
         formData,
         {
           headers: {

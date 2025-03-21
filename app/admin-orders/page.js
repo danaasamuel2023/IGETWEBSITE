@@ -36,7 +36,7 @@ export default function OrdersManagement() {
       if (filter.startDate) queryParams += `&startDate=${filter.startDate}`;
       if (filter.endDate) queryParams += `&endDate=${filter.endDate}`;
       
-      const response = await axios.get(`http://localhost:5000/api/orders/all?${queryParams}`, {
+      const response = await axios.get(`https://iget.onrender.com/api/orders/all?${queryParams}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -74,7 +74,7 @@ export default function OrdersManagement() {
 
   const handleStatusChange = async () => {
     try {
-      const response = await axios.put(`http://localhost:5000/api/orders/${selectedOrder._id}/status`, {
+      const response = await axios.put(`https://iget.onrender.com/api/orders/${selectedOrder._id}/status`, {
         status: newStatus
       }, {
         headers: {
@@ -147,7 +147,7 @@ export default function OrdersManagement() {
       setLoading(true);
       
       // Fetch all orders without pagination for export
-      const response = await axios.get(`http://localhost:5000/api/orders/all?limit=1000`, {
+      const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
