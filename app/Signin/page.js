@@ -1,12 +1,11 @@
 // pages/auth.js
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import logo from '../../images/IgetWlogo.jpg'
-
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,8 +17,28 @@ export default function Auth() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
   const router = useRouter();
+
+  // Check for dark mode on component mount and when system preference changes
+  useEffect(() => {
+    // Check if user prefers dark mode
+    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeQuery.matches);
+
+    // Listen for changes in system dark mode preference
+    const handleDarkModeChange = (e) => {
+      setIsDarkMode(e.matches);
+    };
+    
+    darkModeQuery.addEventListener('change', handleDarkModeChange);
+    
+    // Clean up event listener
+    return () => {
+      darkModeQuery.removeEventListener('change', handleDarkModeChange);
+    };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -107,14 +126,47 @@ export default function Auth() {
     setError('');
   };
 
+  // Conditional classes based on dark mode
+  const pageClass = isDarkMode 
+    ? "min-h-screen flex items-center justify-center bg-gray-900" 
+    : "min-h-screen flex items-center justify-center bg-gray-100";
+    
+  const cardClass = isDarkMode
+    ? "bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-md"
+    : "bg-white p-8 rounded-lg shadow-md w-full max-w-md";
+    
+  const headingClass = isDarkMode
+    ? "text-2xl font-bold text-center mb-6 text-white"
+    : "text-2xl font-bold text-center mb-6";
+    
+  const labelClass = isDarkMode
+    ? "block text-gray-300 font-medium mb-2"
+    : "block text-gray-700 font-medium mb-2";
+    
+  const inputClass = isDarkMode
+    ? "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white"
+    : "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
+    
+  const errorClass = isDarkMode
+    ? "bg-red-900 text-red-200 p-3 rounded mb-4"
+    : "bg-red-50 text-red-700 p-3 rounded mb-4";
+    
+  const linkTextClass = isDarkMode
+    ? "text-blue-400 hover:underline"
+    : "text-blue-600 hover:underline";
+    
+  const paragraphClass = isDarkMode
+    ? "text-gray-300"
+    : "text-gray-600";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className={pageClass}>
       <Head>
-        <title>{isLogin ? 'Login' : 'Sign Up'} | Your App</title>
+        <title>{isLogin ? 'Login' : 'Sign Up'} | IGet</title>
         <meta name="description" content="Authentication page" />
       </Head>
       
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+      <div className={cardClass}>
         <div className="flex justify-center mb-6">
           {/* Company Logo */}
           <div className="relative w-48 h-16">
@@ -128,19 +180,19 @@ export default function Auth() {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-center mb-6">
+        <h1 className={headingClass}>
           {isLogin ? 'Login to Your Account' : 'Create an Account'}
         </h1>
         
         {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded mb-4">
+          <div className={errorClass}>
             {error}
           </div>
         )}
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="username" className="block text-gray-700 font-medium mb-2">
+            <label htmlFor="username" className={labelClass}>
               Username or Email
             </label>
             <input
@@ -149,7 +201,7 @@ export default function Auth() {
               name="username"
               value={formData.username}
               onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputClass}
               placeholder="Enter your username or email"
             />
           </div>
@@ -157,7 +209,7 @@ export default function Auth() {
           {!isLogin && (
             <>
               <div className="mb-4">
-                <label htmlFor="email" className="block text-gray-700 font-medium mb-2">
+                <label htmlFor="email" className={labelClass}>
                   Email
                 </label>
                 <input
@@ -166,13 +218,13 @@ export default function Auth() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                   placeholder="Enter your email"
                 />
               </div>
               
               <div className="mb-4">
-                <label htmlFor="phone" className="block text-gray-700 font-medium mb-2">
+                <label htmlFor="phone" className={labelClass}>
                   Phone Number
                 </label>
                 <input
@@ -181,7 +233,7 @@ export default function Auth() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={inputClass}
                   placeholder="Enter your phone number"
                 />
               </div>
@@ -189,7 +241,7 @@ export default function Auth() {
           )}
           
           <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
+            <label htmlFor="password" className={labelClass}>
               Password
             </label>
             <input
@@ -198,7 +250,7 @@ export default function Auth() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputClass}
               placeholder="Enter your password"
             />
           </div>
@@ -223,7 +275,7 @@ export default function Auth() {
           
           {isLogin && (
             <div className="mt-4 text-center">
-              <Link href="/forgot-password" className="text-blue-600 hover:underline">
+              <Link href="/forgot-password" className={linkTextClass}>
                 Forgot password?
               </Link>
             </div>
@@ -231,12 +283,12 @@ export default function Auth() {
         </form>
         
         <div className="mt-6 text-center">
-          <p className="text-gray-600">
+          <p className={paragraphClass}>
             {isLogin ? "Don't have an account?" : "Already have an account?"}
             <button
               type="button"
               onClick={toggleAuthMode}
-              className="ml-2 text-blue-600 hover:underline"
+              className={`ml-2 ${linkTextClass}`}
             >
               {isLogin ? 'Sign Up' : 'Login'}
             </button>

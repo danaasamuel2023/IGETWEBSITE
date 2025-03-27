@@ -91,41 +91,41 @@ const ApiKeyManager = () => {
   }, []);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">API Key Management</h2>
+    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md dark:shadow-lg transition-colors duration-300">
+      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">API Key Management</h2>
 
       {apiKeyData.loading ? (
         <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
         </div>
       ) : apiKeyData.error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4">
           {apiKeyData.error}
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
+          <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="py-3 px-4 border-b text-left">Status</th>
-                <th className="py-3 px-4 border-b text-left">API Key</th>
-                <th className="py-3 px-4 border-b text-left">Actions</th>
+              <tr className="bg-gray-100 dark:bg-gray-700">
+                <th className="py-3 px-4 border-b text-left text-gray-600 dark:text-gray-300">Status</th>
+                <th className="py-3 px-4 border-b text-left text-gray-600 dark:text-gray-300">API Key</th>
+                <th className="py-3 px-4 border-b text-left text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td className="py-4 px-4 border-b">
                   {apiKeyData.hasApiKey ? (
-                    <span className="bg-green-100 text-green-800 py-1 px-3 rounded-full text-sm">
+                    <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300 py-1 px-3 rounded-full text-sm">
                       Active
                     </span>
                   ) : (
-                    <span className="bg-gray-100 text-gray-800 py-1 px-3 rounded-full text-sm">
+                    <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 py-1 px-3 rounded-full text-sm">
                       Not Generated
                     </span>
                   )}
                 </td>
-                <td className="py-4 px-4 border-b font-mono">
+                <td className="py-4 px-4 border-b font-mono text-gray-900 dark:text-white">
                   {apiKeyData.hasApiKey ? apiKeyData.apiKey : 'No API key generated'}
                 </td>
                 <td className="py-4 px-4 border-b">
@@ -133,7 +133,7 @@ const ApiKeyManager = () => {
                     <button 
                       onClick={revokeApiKey}
                       disabled={actionLoading}
-                      className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+                      className="bg-red-500 hover:bg-red-600 dark:bg-red-700 dark:hover:bg-red-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
                     >
                       {actionLoading ? 'Revoking...' : 'Revoke Key'}
                     </button>
@@ -141,7 +141,7 @@ const ApiKeyManager = () => {
                     <button 
                       onClick={generateApiKey}
                       disabled={actionLoading}
-                      className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+                      className="bg-blue-500 hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
                     >
                       {actionLoading ? 'Generating...' : 'Generate Key'}
                     </button>
@@ -155,14 +155,14 @@ const ApiKeyManager = () => {
 
       {/* Instructions for using the API key */}
       {apiKeyData.hasApiKey && (
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">Using Your API Key</h3>
-          <p className="mb-2">Include your API key in request headers:</p>
-          <pre className="bg-gray-100 p-3 rounded overflow-x-auto">
+        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Using Your API Key</h3>
+          <p className="mb-2 text-gray-700 dark:text-gray-300">Include your API key in request headers:</p>
+          <pre className="bg-gray-100 dark:bg-gray-700 p-3 rounded overflow-x-auto text-gray-900 dark:text-white">
             <code>
               {`
 // Example API request
-fetch('https://yourapi.com/endpoint', {
+fetch('https://iget.onrender.com/endpoint', {
   headers: {
     'x-api-key': '${apiKeyData.apiKey.replace('••••••••', '[YOUR_FULL_API_KEY]')}'
   }
