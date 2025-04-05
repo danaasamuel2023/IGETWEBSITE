@@ -126,7 +126,7 @@ export default function Auth() {
     setError('');
   };
 
-  // Conditional classes based on dark mode
+  // Improved conditional classes with better contrast for text visibility
   const pageClass = isDarkMode 
     ? "min-h-screen flex items-center justify-center bg-gray-900" 
     : "min-h-screen flex items-center justify-center bg-gray-100";
@@ -137,27 +137,29 @@ export default function Auth() {
     
   const headingClass = isDarkMode
     ? "text-2xl font-bold text-center mb-6 text-white"
-    : "text-2xl font-bold text-center mb-6";
+    : "text-2xl font-bold text-center mb-6 text-gray-900";
     
   const labelClass = isDarkMode
-    ? "block text-gray-300 font-medium mb-2"
-    : "block text-gray-700 font-medium mb-2";
+    ? "block text-white font-medium mb-2"
+    : "block text-gray-800 font-medium mb-2";
     
   const inputClass = isDarkMode
-    ? "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white"
-    : "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500";
+    ? "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white border-gray-600 placeholder-gray-400"
+    : "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 text-gray-900 placeholder-gray-500";
     
   const errorClass = isDarkMode
-    ? "bg-red-900 text-red-200 p-3 rounded mb-4"
-    : "bg-red-50 text-red-700 p-3 rounded mb-4";
+    ? "bg-red-900 text-white p-3 rounded mb-4 font-medium"
+    : "bg-red-100 text-red-800 p-3 rounded mb-4 font-medium";
     
   const linkTextClass = isDarkMode
-    ? "text-blue-400 hover:underline"
-    : "text-blue-600 hover:underline";
+    ? "text-blue-400 hover:underline font-medium"
+    : "text-blue-600 hover:underline font-medium";
     
   const paragraphClass = isDarkMode
-    ? "text-gray-300"
-    : "text-gray-600";
+    ? "text-white"
+    : "text-gray-700";
+
+  const buttonClass = "w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium";
 
   return (
     <div className={pageClass}>
@@ -257,7 +259,7 @@ export default function Auth() {
           
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200"
+            className={buttonClass}
             disabled={loading}
           >
             {loading ? (

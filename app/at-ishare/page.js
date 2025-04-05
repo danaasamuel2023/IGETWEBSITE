@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const ATiShareBundleCards = () => {
+const ATFlexiNetBundleCards = () => {
   const [bundles, setBundles] = useState([]);
   const [filteredBundles, setFilteredBundles] = useState([]);
   const [selectedBundleIndex, setSelectedBundleIndex] = useState(null);
@@ -19,7 +19,7 @@ const ATiShareBundleCards = () => {
         const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
         // Filter for AT bundles only
         const atBundles = response.data.data.filter(bundle => 
-          bundle.network === 'at' || bundle.type === 'AT-ishare');
+          bundle.network === 'at' || bundle.type === 'AT-flexinet');
         setBundles(atBundles);
         setFilteredBundles(atBundles);
       } catch (err) {
@@ -38,7 +38,7 @@ const ATiShareBundleCards = () => {
     <svg width="80" height="80" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
       <circle cx="100" cy="100" r="85" fill="#00ADEF" stroke="#fff" strokeWidth="2"/>
       <text x="100" y="85" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="40" fill="white">AT</text>
-      <text x="100" y="125" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="24" fill="white">iSHARE</text>
+      <text x="100" y="125" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="24" fill="white">FLEXINET</text>
     </svg>
   );
 
@@ -86,7 +86,7 @@ const ATiShareBundleCards = () => {
           recipientNumber: phoneNumber,
           capacity: bundle.capacity,
           price: parseFloat(bundle.price),
-          bundleType: bundle.type || 'AT-ishare'
+          bundleType: bundle.type || 'AT-flexinet'
         },
         {
           headers: {
@@ -131,7 +131,7 @@ const ATiShareBundleCards = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-center mb-6">
         <ATLogo />
-        <h1 className="text-3xl font-bold ml-4">AT iShare Bundles</h1>
+        <h1 className="text-3xl font-bold ml-4">AT FLEXINET Data Bundles</h1>
       </div>
       
       {message.text && (
@@ -149,7 +149,7 @@ const ATiShareBundleCards = () => {
 
       {filteredBundles.length === 0 && !isLoading ? (
         <div className="bg-blue-100 p-10 text-center rounded-lg border border-blue-400">
-          <p className="text-lg text-blue-800">No AT iShare bundles available at the moment.</p>
+          <p className="text-lg text-blue-800">No AT FLEXINET Data bundles available at the moment.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -208,4 +208,4 @@ const ATiShareBundleCards = () => {
   );
 };
 
-export default ATiShareBundleCards;
+export default ATFlexiNetBundleCards;

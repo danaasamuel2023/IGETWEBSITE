@@ -20,6 +20,10 @@ export default function OrdersManagement() {
     startDate: '',
     endDate: ''
   });
+  // Add state for selected orders
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
 
   // Fetch orders on component mount
   useEffect(() => {
@@ -72,6 +76,21 @@ export default function OrdersManagement() {
     setSelectedOrder(null);
   };
 
+  // Handle bulk modal open
+  const handleOpenBulkModal = () => {
+    if (selectedOrders.length === 0) {
+      setError('Please select at least one order to update');
+      return;
+    }
+    setShowBulkModal(true);
+    setBulkStatus('');
+  };
+
+  // Handle bulk modal close
+  const handleCloseBulkModal = () => {
+    setShowBulkModal(false);
+  };
+
   const handleStatusChange = async () => {
     try {
       const response = await axios.put(`https://iget.onrender.com/api/orders/${selectedOrder._id}/status`, {
@@ -95,6 +114,75 @@ export default function OrdersManagement() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update order status');
       console.error('Error updating order status:', err);
+    }
+  };
+
+  // Handle bulk status update
+  const handleBulkStatusChange = async () => {
+    if (!bulkStatus) {
+      setError('Please select a status to update');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // You might need to create a new API endpoint for bulk updates
+      // For now, we'll use Promise.all to make multiple requests
+      const updatePromises = selectedOrders.map(orderId => 
+        axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
+          status: bulkStatus
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          }
+        })
+      );
+      
+      const results = await Promise.all(updatePromises);
+      
+      // Check if all updates were successful
+      const allSuccessful = results.every(result => result.data && result.data.success);
+      
+      if (allSuccessful) {
+        // Update orders in the list
+        setOrders(orders.map(order => 
+          selectedOrders.includes(order._id) ? { ...order, status: bulkStatus } : order
+        ));
+        
+        // Clear selected orders
+        setSelectedOrders([]);
+        handleCloseBulkModal();
+      } else {
+        setError('Some orders failed to update');
+      }
+    } catch (err) {
+      setError('Failed to update multiple orders');
+      console.error('Error updating multiple orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle order selection
+  const handleOrderSelect = (orderId) => {
+    setSelectedOrders(prev => {
+      if (prev.includes(orderId)) {
+        return prev.filter(id => id !== orderId);
+      } else {
+        return [...prev, orderId];
+      }
+    });
+  };
+
+  // Handle select all orders
+  const handleSelectAll = () => {
+    if (selectedOrders.length === orders.length) {
+      // If all are selected, unselect all
+      setSelectedOrders([]);
+    } else {
+      // Otherwise, select all
+      setSelectedOrders(orders.map(order => order._id));
     }
   };
 
@@ -199,15 +287,25 @@ export default function OrdersManagement() {
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0">Order Management</h1>
-          <button
-            onClick={exportToExcel}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export to Excel
-          </button>
+          <div className="flex space-x-2">
+            {selectedOrders.length > 0 && (
+              <button
+                onClick={handleOpenBulkModal}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Update Selected ({selectedOrders.length})
+              </button>
+            )}
+            <button
+              onClick={exportToExcel}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export to Excel
+            </button>
+          </div>
         </div>
 
         {/* Filter Form */}
@@ -305,6 +403,16 @@ export default function OrdersManagement() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        onChange={handleSelectAll}
+                        checked={orders.length > 0 && selectedOrders.length === orders.length}
+                      />
+                    </div>
+                  </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bundle Type</th>
@@ -319,7 +427,17 @@ export default function OrdersManagement() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {orders.length > 0 ? (
                   orders.map((order) => (
-                    <tr key={order._id}>
+                    <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50" : ""}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                            onChange={() => handleOrderSelect(order._id)}
+                            checked={selectedOrders.includes(order._id)}
+                          />
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {order.orderReference || order._id.substring(0, 8) + '...'}
                       </td>
@@ -355,13 +473,12 @@ export default function OrdersManagement() {
                         >
                           Update Status
                         </button>
-                       
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500">
                       No orders found
                     </td>
                   </tr>
@@ -471,7 +588,7 @@ export default function OrdersManagement() {
         )}
       </div>
 
-      {/* Status Update Modal */}
+      {/* Individual Status Update Modal */}
       {showModal && selectedOrder && (
         <div className="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -511,6 +628,74 @@ export default function OrdersManagement() {
                           <option value="completed">Completed</option>
                           <option value="failed">Failed</option>
                           <option value="refunded">Refunded</option>
+                          </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleStatusChange}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Status Update Modal */}
+      {showBulkModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={handleCloseBulkModal}></div>
+
+            {/* Modal */}
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                      Bulk Update Orders
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-4">
+                        Update status for {selectedOrders.length} selected orders
+                      </p>
+                      <div className="mb-4">
+                        <label htmlFor="bulkStatus" className="block text-sm font-medium text-gray-700 mb-1">
+                          Status
+                        </label>
+                        <select
+                          id="bulkStatus"
+                          name="bulkStatus"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          value={bulkStatus}
+                          onChange={(e) => setBulkStatus(e.target.value)}
+                        >
+                          <option value="">Select Status</option>
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="completed">Completed</option>
+                          <option value="failed">Failed</option>
+                          <option value="refunded">Refunded</option>
                         </select>
                       </div>
                     </div>
@@ -520,15 +705,15 @@ export default function OrdersManagement() {
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={handleStatusChange}
+                  onClick={handleBulkStatusChange}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
-                  Update Status
+                  Update All
                 </button>
                 <button
                   type="button"
+                  onClick={handleCloseBulkModal}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={handleCloseModal}
                 >
                   Cancel
                 </button>

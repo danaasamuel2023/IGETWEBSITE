@@ -19,7 +19,7 @@ const TelecelBundleCards = () => {
         const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
         // Filter for Telecel bundles only
         const telecelBundles = response.data.data.filter(bundle => 
-          bundle.network === 'telecel' || bundle.type === 'Telecel-5959');
+          bundle.network === 'telecel' || bundle.type === 'Telecel-555 *126#');
         setBundles(telecelBundles);
         setFilteredBundles(telecelBundles);
       } catch (err) {
@@ -37,8 +37,9 @@ const TelecelBundleCards = () => {
   const TelecelLogo = () => (
     <svg width="80" height="80" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
       <circle cx="100" cy="100" r="85" fill="#e30613" stroke="#fff" strokeWidth="2"/>
-      <text x="100" y="115" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="24" fill="white">TELECEL</text>
-      <text x="100" y="140" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="20" fill="white">5959</text>
+      <text x="100" y="105" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="20" fill="white">TELECEL</text>
+      <text x="100" y="130" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="16" fill="white">ENTERPRICE DATA</text>
+      <text x="100" y="150" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="14" fill="white">*126#</text>
     </svg>
   );
 
@@ -86,7 +87,7 @@ const TelecelBundleCards = () => {
           recipientNumber: phoneNumber,
           capacity: bundle.capacity,
           price: parseFloat(bundle.price),
-          bundleType: bundle.type || 'Telecel-5959'
+          bundleType: bundle.type || 'Telecel-555 *126#'
         },
         {
           headers: {
@@ -132,7 +133,7 @@ const TelecelBundleCards = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-center mb-6">
         <TelecelLogo />
-        <h1 className="text-3xl font-bold ml-4">Telecel 5959 Bundles</h1>
+        <h1 className="text-3xl font-bold ml-4">Telecel Enterprise Data Bundles</h1>
       </div>
       
       {message.text && (

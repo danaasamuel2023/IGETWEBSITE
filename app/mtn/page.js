@@ -16,18 +16,8 @@ const BundleFilter = () => {
 
   const bundleTypes = [
     { id: 'mtnup2u', label: 'MTN Up2U' },
-    { id: 'mtn-fibre', label: 'MTN Fibre' },
     { id: 'mtn-justforu', label: 'MTN Just For U' }
   ];
-
-  // MTN Logo SVG
-  const MTNLogo = () => (
-    <svg width="80" height="80" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="100" cy="100" r="85" fill="#ffcc00" stroke="#000" strokeWidth="2"/>
-      <path d="M50 80 L80 140 L100 80 L120 140 L150 80" stroke="#000" strokeWidth="12" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-      <text x="100" y="170" textAnchor="middle" fontFamily="Arial" fontWeight="bold" fontSize="28">MTN</text>
-    </svg>
-  );
 
   useEffect(() => {
     const fetchBundles = async () => {
@@ -73,8 +63,6 @@ const BundleFilter = () => {
   };
   
   const handlePurchase = async () => {
-   
-    
     setProcessingOrder(true);
     
     try {
@@ -136,8 +124,8 @@ const BundleFilter = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-center mb-6">
-        <MTNLogo />
-        <h1 className="text-3xl font-bold ml-4">MTN Data Bundles</h1>
+        <h1 className="text-5xl font-bold text-yellow-400">MTN</h1>
+        <h2 className="text-3xl font-bold ml-3">Data Bundles</h2>
       </div>
       
       {/* Bundle Type Filter */}
@@ -168,9 +156,7 @@ const BundleFilter = () => {
               className="flex flex-col overflow-hidden shadow-md transition-transform duration-300 hover:translate-y-[-5px]"
             >
               <div className="flex flex-col items-center justify-center p-5 space-y-3 bg-yellow-400">
-                <div className="w-16 h-16 flex justify-center items-center">
-                  <MTNLogo />
-                </div>
+                <h3 className="text-3xl font-bold">MTN</h3>
                 <h3 className="text-xl font-bold">
                   {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                 </h3>
