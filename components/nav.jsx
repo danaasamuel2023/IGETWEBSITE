@@ -97,7 +97,10 @@ const Navigation = () => {
    };
 
    // Toggle services dropdown
-   const toggleServicesDropdown = () => {
+   const toggleServicesDropdown = (e) => {
+     // Prevent default to avoid navigation
+     e.preventDefault();
+     e.stopPropagation();
      setIsServicesDropdownOpen(!isServicesDropdownOpen);
    };
 
@@ -112,11 +115,21 @@ const Navigation = () => {
      setIsMenuOpen(false);
    };
 
-   // Handle link click to close menus
-   const handleLinkClick = (e) => {
-     // Prevent event bubbling
+   // Handle navigation for service links
+   const handleServiceNavigation = (e, path) => {
+     e.preventDefault();
      e.stopPropagation();
      
+     // Close menus
+     setIsMenuOpen(false);
+     setIsServicesDropdownOpen(false);
+     
+     // Navigate programmatically
+     router.push(path);
+   };
+
+   // Handle regular link click to close menus
+   const handleLinkClick = () => {
      // Close both menus
      setIsMenuOpen(false);
      setIsServicesDropdownOpen(false);
@@ -191,14 +204,14 @@ const Navigation = () => {
              {isServicesDropdownOpen && (
                <div className="absolute left-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-10">
                  {serviceTypes.map((service, index) => (
-                   <Link
+                   <a
                      key={index}
                      href={`/${service}`}
                      className="block px-4 py-2 hover:bg-gray-700 capitalize"
-                     onClick={handleLinkClick}
+                     onClick={(e) => handleServiceNavigation(e, `/${service}`)}
                    >
                      {service}
-                   </Link>
+                   </a>
                  ))}
                </div>
              )}
@@ -228,7 +241,7 @@ const Navigation = () => {
                      className="hover:text-gray-300 transition-colors"
                      onClick={handleLinkClick}
                    >
-                     Users
+                     Admin
                    </Link>
                    <Link 
                      href="/admin-orders" 
@@ -366,14 +379,14 @@ const Navigation = () => {
                    {isServicesDropdownOpen && (
                      <div className="pl-4 mt-2 space-y-2">
                        {serviceTypes.map((service, index) => (
-                         <Link
+                         <a
                            key={index}
                            href={`/${service}`}
                            className="block px-4 py-2 text-white hover:bg-gray-800 capitalize"
-                           onClick={handleLinkClick}
+                           onClick={(e) => handleServiceNavigation(e, `/${service}`)}
                          >
                            {service}
-                         </Link>
+                         </a>
                        ))}
                      </div>
                    )}
@@ -403,8 +416,7 @@ const Navigation = () => {
                            className="block px-4 py-2 text-white hover:bg-gray-800"
                            onClick={handleLinkClick}
                          >
-                           Users
-                         </Link>
+                          Admin                         </Link>
                          <Link 
                            href="/admin-orders" 
                            className="block px-4 py-2 text-white hover:bg-gray-800"

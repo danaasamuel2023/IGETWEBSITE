@@ -35,12 +35,12 @@ const BundleManagement = () => {
   
   const bundleTypes = [
     'mtnup2u',
-    'mtn-fibre',
+   
     'mtn-justforu',
     'AT-ishare',
     'Telecel-5959',
     'AfA-registration',
-    'other'
+   
   ];
 
   // Fetch bundles by type
