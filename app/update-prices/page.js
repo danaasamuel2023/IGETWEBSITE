@@ -146,7 +146,7 @@ const BundlePriceList = () => {
     <AdminLayout>
       <div className="max-w-7xl mx-auto p-4 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold">Bundle Prices</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bundle Prices</h1>
           
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <div className="relative flex-grow sm:flex-grow-0">
@@ -155,15 +155,15 @@ const BundlePriceList = () => {
                 placeholder="Search bundles..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border rounded-lg w-full"
+                className="pl-10 pr-4 py-2 border rounded-lg w-full bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               />
-              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" />
               {searchTerm && (
                 <button 
                   onClick={() => setSearchTerm('')}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2"
                 >
-                  <X className="w-4 h-4 text-gray-400" />
+                  <X className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 </button>
               )}
             </div>
@@ -180,7 +180,7 @@ const BundlePriceList = () => {
         </div>
 
         {error && (
-          <div className="bg-red-50 p-4 rounded-lg flex items-center gap-2 text-red-700">
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <span className="flex-grow">{error}</span>
             <button onClick={() => setError('')} className="flex-shrink-0">
@@ -190,7 +190,7 @@ const BundlePriceList = () => {
         )}
         
         {successMessage && (
-          <div className="bg-green-50 p-4 rounded-lg flex items-center gap-2 text-green-700">
+          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-400">
             <Check className="w-5 h-5 flex-shrink-0" />
             <span className="flex-grow">{successMessage}</span>
             <button onClick={() => setSuccessMessage('')} className="flex-shrink-0">
@@ -200,7 +200,7 @@ const BundlePriceList = () => {
         )}
 
         {!showAnyResults && !loading && (
-          <div className="bg-yellow-50 p-4 rounded-lg flex items-center gap-2 text-yellow-700">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
             <span>
               {searchTerm 
@@ -216,9 +216,9 @@ const BundlePriceList = () => {
             if (bundles.length === 0) return null;
             
             return (
-              <div key={type} className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="p-4 bg-blue-50">
-                  <h2 className="text-xl font-semibold">{type}</h2>
+              <div key={type} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{type}</h2>
                 </div>
                 
                 <div className="p-4">
@@ -226,20 +226,20 @@ const BundlePriceList = () => {
                     {bundles.map((bundle) => (
                       <div 
                         key={bundle._id}
-                        className="bg-gray-50 p-4 rounded-lg"
+                        className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg"
                       >
                         <div className="flex flex-col">
-                          <span className="text-lg font-semibold">{bundle.capacity}MB</span>
+                          <span className="text-lg font-semibold text-gray-900 dark:text-white">{bundle.capacity}MB</span>
                           
                           {editingBundle === bundle._id ? (
                             <div className="flex flex-col gap-2 mt-2">
                               <div className="flex items-center">
-                                <span className="text-gray-700 mr-1">GH¢</span>
+                                <span className="text-gray-700 dark:text-gray-300 mr-1">GH¢</span>
                                 <input
                                   type="number"
                                   value={editPrice}
                                   onChange={(e) => setEditPrice(e.target.value)}
-                                  className="flex-grow p-1 border rounded w-full"
+                                  className="flex-grow p-1 border rounded w-full bg-white dark:bg-gray-600 text-gray-900 dark:text-white"
                                   step="0.01"
                                   min="0"
                                 />
@@ -248,14 +248,14 @@ const BundlePriceList = () => {
                                 <button
                                   onClick={() => updateBundlePrice(bundle._id, type)}
                                   disabled={updateLoading}
-                                  className="p-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 flex items-center gap-1"
+                                  className="p-1 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-700 flex items-center gap-1"
                                 >
                                   {updateLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                                   Save
                                 </button>
                                 <button
                                   onClick={cancelEditing}
-                                  className="p-1 text-sm bg-gray-100 rounded hover:bg-gray-200 flex items-center gap-1"
+                                  className="p-1 text-sm bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center gap-1"
                                 >
                                   <X className="w-3 h-3" />
                                   Cancel
@@ -264,12 +264,12 @@ const BundlePriceList = () => {
                             </div>
                           ) : (
                             <div className="flex justify-between items-center mt-2">
-                              <div className="text-gray-700 font-medium">
+                              <div className="text-gray-700 dark:text-gray-300 font-medium">
                                 GH¢ {parseFloat(bundle.price).toFixed(2)}
                               </div>
                               <button
                                 onClick={() => startEditing(bundle._id, bundle.price)}
-                                className="p-1 text-blue-500 hover:text-blue-700 rounded-full hover:bg-blue-50"
+                                className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                 title="Edit price"
                               >
                                 <Edit2 className="w-4 h-4" />

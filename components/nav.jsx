@@ -96,9 +96,8 @@ const Navigation = () => {
      setIsServicesDropdownOpen(false);
    };
 
-   // Toggle services dropdown
+   // Toggle services dropdown (only used for desktop view now)
    const toggleServicesDropdown = (e) => {
-     // Prevent default to avoid navigation
      e.preventDefault();
      e.stopPropagation();
      setIsServicesDropdownOpen(!isServicesDropdownOpen);
@@ -115,17 +114,14 @@ const Navigation = () => {
      setIsMenuOpen(false);
    };
 
-   // Handle navigation for service links
-   const handleServiceNavigation = (e, path) => {
-     e.preventDefault();
-     e.stopPropagation();
-     
-     // Close menus
+   // Improved navigation handler for service links - fix for mobile view
+   const navigateToService = (service) => {
+     // Close menus first
      setIsMenuOpen(false);
      setIsServicesDropdownOpen(false);
      
-     // Navigate programmatically
-     router.push(path);
+     // Then navigate programmatically
+     router.push(`/${service}`);
    };
 
    // Handle regular link click to close menus
@@ -204,14 +200,13 @@ const Navigation = () => {
              {isServicesDropdownOpen && (
                <div className="absolute left-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-10">
                  {serviceTypes.map((service, index) => (
-                   <a
+                   <button
                      key={index}
-                     href={`/${service}`}
-                     className="block px-4 py-2 hover:bg-gray-700 capitalize"
-                     onClick={(e) => handleServiceNavigation(e, `/${service}`)}
+                     className="block w-full text-left px-4 py-2 hover:bg-gray-700 capitalize"
+                     onClick={() => navigateToService(service)}
                    >
                      {service}
-                   </a>
+                   </button>
                  ))}
                </div>
              )}
@@ -354,42 +349,22 @@ const Navigation = () => {
                    Home
                  </Link>
 
-                 {/* Services Dropdown */}
+                 {/* Services Section for Mobile - Always visible */}
                  <div>
-                   <button
-                     onClick={toggleServicesDropdown}
-                     className="w-full text-left px-4 py-2 flex justify-between items-center hover:bg-gray-800"
-                   >
+                   <div className="px-4 py-2 text-white font-medium border-b border-gray-700 mb-2">
                      Services
-                     <svg
-                       className="w-5 h-5"
-                       fill="none"
-                       stroke="currentColor"
-                       viewBox="0 0 24 24"
-                     >
-                       <path
-                         strokeLinecap="round"
-                         strokeLinejoin="round"
-                         strokeWidth="2"
-                         d={isServicesDropdownOpen ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"}
-                       />
-                     </svg>
-                   </button>
-
-                   {isServicesDropdownOpen && (
-                     <div className="pl-4 mt-2 space-y-2">
-                       {serviceTypes.map((service, index) => (
-                         <a
-                           key={index}
-                           href={`/${service}`}
-                           className="block px-4 py-2 text-white hover:bg-gray-800 capitalize"
-                           onClick={(e) => handleServiceNavigation(e, `/${service}`)}
-                         >
-                           {service}
-                         </a>
-                       ))}
-                     </div>
-                   )}
+                   </div>
+                   <div className="pl-4 space-y-2">
+                     {serviceTypes.map((service, index) => (
+                       <button
+                         key={index}
+                         className="block w-full text-left px-4 py-2 text-white hover:bg-gray-800 capitalize"
+                         onClick={() => navigateToService(service)}
+                       >
+                         {service}
+                       </button>
+                     ))}
+                   </div>
                  </div>
 
                  {user ? (
@@ -416,7 +391,8 @@ const Navigation = () => {
                            className="block px-4 py-2 text-white hover:bg-gray-800"
                            onClick={handleLinkClick}
                          >
-                          Admin                         </Link>
+                           Admin
+                         </Link>
                          <Link 
                            href="/admin-orders" 
                            className="block px-4 py-2 text-white hover:bg-gray-800"
