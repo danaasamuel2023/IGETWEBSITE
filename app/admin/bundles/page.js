@@ -207,7 +207,7 @@ const BundleManagement = () => {
                   value={bundleForm.capacity}
                   onChange={handleFormChange}
                   className="w-full border rounded p-2"
-                  placeholder="e.g. 5GB"
+                  placeholder="e.g. 5000MB"
                   required
                 />
               </div>
