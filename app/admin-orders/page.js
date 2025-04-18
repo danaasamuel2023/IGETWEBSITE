@@ -339,10 +339,11 @@ export default function OrdersManagement() {
                 onChange={handleFilterChange}
               >
                 <option value="">All Types</option>
-                <option value="basic">Basic</option>
-                <option value="standard">Standard</option>
-                <option value="premium">Premium</option>
                 <option value="mtnup2u">MTN Up2U</option>
+                <option value="mtn-justforu">MTN JustForU</option>
+                <option value="AT-ishare">AT iShare</option>
+                <option value="Telecel-5959">Telecel 5959</option>
+                <option value="AfA-registration">AfA Registration</option>
               </select>
             </div>
             
