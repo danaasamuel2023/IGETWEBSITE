@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -20,49 +21,90 @@ export default function OrdersManagement() {
     startDate: '',
     endDate: ''
   });
-  // Add state for selected orders
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
+  const [itemsPerPage] = useState(10);
 
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
-  }, [currentPage, filter]);
+  }, []);
 
+  // Apply client-side filtering when filter state changes
+  useEffect(() => {
+    applyFilters();
+  }, [filter, orders, currentPage]);
+  
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      let queryParams = `page=${currentPage}&limit=10`;
-      if (filter.status) queryParams += `&status=${filter.status}`;
-      if (filter.bundleType) queryParams += `&bundleType=${filter.bundleType}`;
-      if (filter.startDate) queryParams += `&startDate=${filter.startDate}`;
-      if (filter.endDate) queryParams += `&endDate=${filter.endDate}`;
-      
-      const response = await axios.get(`https://iget.onrender.com/api/orders/all?${queryParams}`, {
+      // Fetch all orders without pagination for client-side filtering
+      const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
       });
       
-      // Check the structure of the response
-      console.log('API Response:', response.data);
-      
       if (response.data && response.data.success) {
         setOrders(response.data.data || []);
-        setTotalPages(response.data.pages || 1);
+        // Initial filtering will be applied by the useEffect
       } else {
         setOrders([]);
+        setFilteredOrders([]);
         setError('Failed to fetch orders data');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch orders');
       console.error('Error fetching orders:', err);
       setOrders([]);
+      setFilteredOrders([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    // Filter orders based on current filters
+    let result = [...orders];
+    
+    if (filter.status) {
+      result = result.filter(order => order.status === filter.status);
+    }
+    
+    if (filter.bundleType) {
+      result = result.filter(order => order.bundleType === filter.bundleType);
+    }
+    
+    if (filter.startDate) {
+      const startDate = new Date(filter.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      result = result.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= startDate;
+      });
+    }
+    
+    if (filter.endDate) {
+      const endDate = new Date(filter.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      result = result.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate <= endDate;
+      });
+    }
+    
+    // Calculate total pages
+    const total = Math.ceil(result.length / itemsPerPage);
+    setTotalPages(total > 0 ? total : 1);
+    
+    // Apply pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedResult = result.slice(startIndex, startIndex + itemsPerPage);
+    
+    setFilteredOrders(paginatedResult);
   };
 
   const handleOpenModal = (order) => {
@@ -76,7 +118,6 @@ export default function OrdersManagement() {
     setSelectedOrder(null);
   };
 
-  // Handle bulk modal open
   const handleOpenBulkModal = () => {
     if (selectedOrders.length === 0) {
       setError('Please select at least one order to update');
@@ -86,13 +127,15 @@ export default function OrdersManagement() {
     setBulkStatus('');
   };
 
-  // Handle bulk modal close
   const handleCloseBulkModal = () => {
     setShowBulkModal(false);
   };
 
   const handleStatusChange = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const response = await axios.put(`https://iget.onrender.com/api/orders/${selectedOrder._id}/status`, {
         status: newStatus
       }, {
@@ -102,11 +145,13 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
-        // Update order in the list
-        setOrders(orders.map(order => 
+        // Update the order in the orders array
+        const updatedOrders = orders.map(order => 
           order._id === selectedOrder._id ? { ...order, status: newStatus } : order
-        ));
+        );
+        setOrders(updatedOrders);
         
+        // Close the modal
         handleCloseModal();
       } else {
         setError('Failed to update order status');
@@ -114,10 +159,11 @@ export default function OrdersManagement() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update order status');
       console.error('Error updating order status:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle bulk status update
   const handleBulkStatusChange = async () => {
     if (!bulkStatus) {
       setError('Please select a status to update');
@@ -126,9 +172,8 @@ export default function OrdersManagement() {
 
     try {
       setLoading(true);
+      setError(null);
       
-      // You might need to create a new API endpoint for bulk updates
-      // For now, we'll use Promise.all to make multiple requests
       const updatePromises = selectedOrders.map(orderId => 
         axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
           status: bulkStatus
@@ -139,23 +184,17 @@ export default function OrdersManagement() {
         })
       );
       
-      const results = await Promise.all(updatePromises);
+      await Promise.all(updatePromises);
       
-      // Check if all updates were successful
-      const allSuccessful = results.every(result => result.data && result.data.success);
+      // Update orders in the state
+      const updatedOrders = orders.map(order => 
+        selectedOrders.includes(order._id) ? { ...order, status: bulkStatus } : order
+      );
+      setOrders(updatedOrders);
       
-      if (allSuccessful) {
-        // Update orders in the list
-        setOrders(orders.map(order => 
-          selectedOrders.includes(order._id) ? { ...order, status: bulkStatus } : order
-        ));
-        
-        // Clear selected orders
-        setSelectedOrders([]);
-        handleCloseBulkModal();
-      } else {
-        setError('Some orders failed to update');
-      }
+      // Clear selected orders and close modal
+      setSelectedOrders([]);
+      handleCloseBulkModal();
     } catch (err) {
       setError('Failed to update multiple orders');
       console.error('Error updating multiple orders:', err);
@@ -164,7 +203,6 @@ export default function OrdersManagement() {
     }
   };
 
-  // Handle order selection
   const handleOrderSelect = (orderId) => {
     setSelectedOrders(prev => {
       if (prev.includes(orderId)) {
@@ -175,26 +213,24 @@ export default function OrdersManagement() {
     });
   };
 
-  // Handle select all orders
   const handleSelectAll = () => {
-    if (selectedOrders.length === orders.length) {
-      // If all are selected, unselect all
+    if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
-      // Otherwise, select all
-      setSelectedOrders(orders.map(order => order._id));
+      setSelectedOrders(filteredOrders.map(order => order._id));
     }
   };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilter(prev => ({ ...prev, [name]: value }));
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page when filter changes
-    fetchOrders();
+    // No need to do anything special here since filtering is now client-side
+    // and handled by useEffect when filter state changes
   };
 
   const resetFilters = () => {
@@ -229,52 +265,32 @@ export default function OrdersManagement() {
     }
   };
 
-  // Export all orders to Excel
   const exportToExcel = async () => {
     try {
-      setLoading(true);
+      // Use the already loaded orders, no need to fetch again
+      const excelData = orders.map(order => ({
+        'Order ID': order._id,
+        'Reference': order.orderReference || 'N/A',
+        'Username': order.user?.username || 'N/A',
+        'Email': order.user?.email || 'N/A',
+        'Phone': order.user?.phone || 'N/A',
+        'Bundle Type': order.bundleType || 'N/A',
+        'Capacity': order.capacity ? (order.capacity/1000) : 0,
+        'Recipient Number': order.recipientNumber || 'N/A',
+        'Price': order.price || 0,
+        'Status': order.status || 'N/A',
+        'Created Date': formatDate(order.createdAt),
+        'Updated Date': formatDate(order.updatedAt)
+      }));
       
-      // Fetch all orders without pagination for export
-      const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('igettoken')}`
-        }
-      });
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
       
-      if (response.data && response.data.success) {
-        const ordersData = response.data.data || [];
-        
-        // Format the data for Excel focusing on capacity and recipient number
-        const excelData = ordersData.map(order => ({
-          'Order ID': order._id,
-          'Reference': order.orderReference || 'N/A',
-          'Username': order.user?.username || 'N/A',
-          'Email': order.user?.email || 'N/A',
-          'Phone': order.user?.phone || 'N/A',
-          'Bundle Type': order.bundleType || 'N/A',
-          'Capacity': order.capacity || 0,
-          'Recipient Number': order.recipientNumber || 'N/A',
-          'Price': order.price || 0,
-          'Status': order.status || 'N/A',
-          'Created Date': formatDate(order.createdAt),
-          'Updated Date': formatDate(order.updatedAt)
-        }));
-        
-        // Create workbook and worksheet
-        const worksheet = XLSX.utils.json_to_sheet(excelData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
-        
-        // Generate Excel file
-        XLSX.writeFile(workbook, "Orders_Export.xlsx");
-      } else {
-        setError('Failed to fetch orders data for export');
-      }
+      XLSX.writeFile(workbook, "Orders_Export.xlsx");
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to export orders');
+      setError('Failed to export orders');
       console.error('Error exporting orders:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -410,7 +426,7 @@ export default function OrdersManagement() {
                         type="checkbox"
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         onChange={handleSelectAll}
-                        checked={orders.length > 0 && selectedOrders.length === orders.length}
+                        checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length}
                       />
                     </div>
                   </th>
@@ -418,7 +434,6 @@ export default function OrdersManagement() {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bundle Type</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient Number</th>
-
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -427,8 +442,8 @@ export default function OrdersManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.length > 0 ? (
-                  orders.map((order) => (
+                {filteredOrders.length > 0 ? (
+                  filteredOrders.map((order) => (
                     <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -453,10 +468,9 @@ export default function OrdersManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.recipientNumber || 'N/A'}
-
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {order.capacity/1000 || 'N/A'}
+                        {order.capacity ? (order.capacity/1000) : 'N/A'} 
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ₵{order.price?.toFixed(2) || '0.00'}
@@ -472,7 +486,7 @@ export default function OrdersManagement() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
                           onClick={() => handleOpenModal(order)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-2"
+                          className="text-indigo-600 hover:text-indigo-900"
                         >
                           Update Status
                         </button>
@@ -492,7 +506,7 @@ export default function OrdersManagement() {
         )}
 
         {/* Pagination */}
-        {!loading && orders.length > 0 && (
+        {!loading && filteredOrders.length > 0 && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
@@ -539,7 +553,6 @@ export default function OrdersManagement() {
                   {/* Page numbers */}
                   {[...Array(totalPages).keys()].map((number) => {
                     const pageNumber = number + 1;
-                    // Show current page, first, last, and immediate neighbors
                     if (
                       pageNumber === 1 ||
                       pageNumber === totalPages ||
@@ -591,9 +604,9 @@ export default function OrdersManagement() {
         )}
       </div>
 
-      {/* Individual Status Update Modal */}
+      {/* Individual Status Update Modal - z-index increased */}
       {showModal && selectedOrder && (
-        <div className="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             {/* Background overlay */}
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={handleCloseModal}></div>
@@ -631,7 +644,7 @@ export default function OrdersManagement() {
                           <option value="completed">Completed</option>
                           <option value="failed">Failed</option>
                           <option value="refunded">Refunded</option>
-                          </select>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -658,9 +671,9 @@ export default function OrdersManagement() {
         </div>
       )}
 
-      {/* Bulk Status Update Modal */}
+      {/* Bulk Status Update Modal - z-index increased */}
       {showBulkModal && (
-        <div className="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             {/* Background overlay */}
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={handleCloseBulkModal}></div>
@@ -726,5 +739,4 @@ export default function OrdersManagement() {
         </div>
       )}
     </AdminLayout>
-  );
-}
+  )};
