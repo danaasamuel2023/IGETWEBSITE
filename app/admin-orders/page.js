@@ -274,14 +274,31 @@ export default function OrdersManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
           <div className="flex flex-wrap gap-2">
-            {selectedOrders.length > 0 && (
-              <button
-                onClick={handleOpenBulkModal}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Update Selected ({selectedOrders.length})
-              </button>
-            )}
+          {selectedOrders.length > 0 ? (
+  <div className="flex flex-wrap items-center gap-2">
+    <span className="text-sm text-gray-700 dark:text-gray-300">
+      {selectedOrders.length} orders selected:
+    </span>
+    <select
+      className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md p-2"
+      value={bulkStatus}
+      onChange={(e) => {
+        if (e.target.value) {
+          handleBulkStatusChange(e.target.value);
+        } else {
+          setBulkStatus(e.target.value);
+        }
+      }}
+    >
+      <option value="">Bulk Update Status</option>
+      <option value="pending">Set All to Pending</option>
+      <option value="processing">Set All to Processing</option>
+      <option value="completed">Set All to Completed</option>
+      <option value="failed">Set All to Failed</option>
+      <option value="refunded">Set All to Refunded</option>
+    </select>
+  </div>
+) : null}
             <button
               onClick={exportToExcel}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
