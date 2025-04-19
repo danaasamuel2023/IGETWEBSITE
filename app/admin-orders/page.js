@@ -34,16 +34,11 @@ export default function OrdersManagement() {
     try {
       setLoading(true);
       
-      // Build query parameters
       let queryParams = `page=${currentPage}&limit=10`;
-      
-      // Add filters to query parameters
       if (filter.status) queryParams += `&status=${filter.status}`;
       if (filter.bundleType) queryParams += `&bundleType=${filter.bundleType}`;
       if (filter.startDate) queryParams += `&startDate=${filter.startDate}`;
       if (filter.endDate) queryParams += `&endDate=${filter.endDate}`;
-      
-      console.log('Sending request with query params:', queryParams);
       
       const response = await axios.get(`https://iget.onrender.com/api/orders/all?${queryParams}`, {
         headers: {
@@ -51,7 +46,7 @@ export default function OrdersManagement() {
         }
       });
       
-      // Log response for debugging
+      // Check the structure of the response
       console.log('API Response:', response.data);
       
       if (response.data && response.data.success) {
@@ -233,7 +228,6 @@ export default function OrdersManagement() {
         return 'bg-gray-100 text-gray-800';
     }
   };
-  
 
   // Export all orders to Excel
   const exportToExcel = async () => {
@@ -252,12 +246,18 @@ export default function OrdersManagement() {
         
         // Format the data for Excel focusing on capacity and recipient number
         const excelData = ordersData.map(order => ({
-        
+          'Order ID': order._id,
+          'Reference': order.orderReference || 'N/A',
+          'Username': order.user?.username || 'N/A',
+          'Email': order.user?.email || 'N/A',
           'Phone': order.user?.phone || 'N/A',
           'Bundle Type': order.bundleType || 'N/A',
           'Capacity': order.capacity || 0,
           'Recipient Number': order.recipientNumber || 'N/A',
-         
+          'Price': order.price || 0,
+          'Status': order.status || 'N/A',
+          'Created Date': formatDate(order.createdAt),
+          'Updated Date': formatDate(order.updatedAt)
         }));
         
         // Create workbook and worksheet
@@ -284,9 +284,9 @@ export default function OrdersManagement() {
         <title>Orders Management | Admin Dashboard</title>
       </Head>
       
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto text-gray-900 dark:text-white">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-          <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
+          <h1 className="text-2xl font-bold mb-4 sm:mb-0">Order Management</h1>
           <div className="flex space-x-2">
             {selectedOrders.length > 0 && (
               <button
@@ -309,14 +309,14 @@ export default function OrdersManagement() {
         </div>
 
         {/* Filter Form */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+        <div className="bg-white p-4 rounded-lg shadow mb-6">
           <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
               <select
                 id="status"
                 name="status"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 dark:text-white dark:bg-gray-700"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.status}
                 onChange={handleFilterChange}
               >
@@ -330,11 +330,11 @@ export default function OrdersManagement() {
             </div>
             
             <div>
-              <label htmlFor="bundleType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Bundle Type</label>
+              <label htmlFor="bundleType" className="block text-sm font-medium text-gray-700">Bundle Type</label>
               <select
                 id="bundleType"
                 name="bundleType"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 dark:text-white dark:bg-gray-700"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.bundleType}
                 onChange={handleFilterChange}
               >
@@ -348,24 +348,24 @@ export default function OrdersManagement() {
             </div>
             
             <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">Start Date</label>
               <input
                 type="date"
                 id="startDate"
                 name="startDate"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 dark:text-white dark:bg-gray-700"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.startDate}
                 onChange={handleFilterChange}
               />
             </div>
             
             <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">End Date</label>
               <input
                 type="date"
                 id="endDate"
                 name="endDate"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 dark:text-white dark:bg-gray-700"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.endDate}
                 onChange={handleFilterChange}
               />
@@ -381,7 +381,7 @@ export default function OrdersManagement() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white dark:bg-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Reset
               </button>
@@ -400,66 +400,68 @@ export default function OrdersManagement() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+          <div className="overflow-x-auto bg-white rounded-lg shadow">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         onChange={handleSelectAll}
                         checked={orders.length > 0 && selectedOrders.length === orders.length}
                       />
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Bundle Type</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recipient Number</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Capacity</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Amount</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bundle Type</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient Number</th>
+
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white divide-y divide-gray-200">
                 {orders.length > 0 ? (
                   orders.map((order) => (
-                    <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""}>
+                    <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50" : ""}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded dark:border-gray-600 dark:bg-gray-700"
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                             onChange={() => handleOrderSelect(order._id)}
                             checked={selectedOrders.includes(order._id)}
                           />
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {order.orderReference || order._id.substring(0, 8) + '...'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
+                        <div className="text-sm text-gray-900">{order.user?.username || 'N/A'}</div>
+                        <div className="text-xs text-gray-500">{order.user?.email || 'N/A'}</div>
+                        <div className="text-xs text-gray-500">{order.user?.phone || 'N/A'}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {order.bundleType || order.bundle?.type || 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {order.bundleType || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {order.recipientNumber || 'N/A'}
+
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {(order.capacity/1000) || order.bundle?.capacity/1000 || 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.capacity/1000 || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         ₵{order.price?.toFixed(2) || '0.00'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(order.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -467,10 +469,10 @@ export default function OrdersManagement() {
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
                           onClick={() => handleOpenModal(order)}
-                          className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-2"
+                          className="text-indigo-600 hover:text-indigo-900 mr-2"
                         >
                           Update Status
                         </button>
@@ -479,7 +481,7 @@ export default function OrdersManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500">
                       No orders found
                     </td>
                   </tr>
@@ -491,13 +493,13 @@ export default function OrdersManagement() {
 
         {/* Pagination */}
         {!loading && orders.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4 rounded-lg shadow">
+          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-lg shadow">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                  currentPage === 1 ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700' : 'text-gray-700 bg-white dark:text-gray-300 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                  currentPage === 1 ? 'text-gray-400 bg-gray-100' : 'text-gray-700 bg-white hover:bg-gray-50'
                 }`}
               >
                 Previous
@@ -505,8 +507,8 @@ export default function OrdersManagement() {
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                  currentPage === totalPages ? 'text-gray-400 bg-gray-100 dark:text-gray-500 dark:bg-gray-700' : 'text-gray-700 bg-white dark:text-gray-300 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                  currentPage === totalPages ? 'text-gray-400 bg-gray-100' : 'text-gray-700 bg-white hover:bg-gray-50'
                 }`}
               >
                 Next
@@ -514,7 +516,7 @@ export default function OrdersManagement() {
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700 dark:text-gray-300">
+                <p className="text-sm text-gray-700">
                   Showing page <span className="font-medium">{currentPage}</span> of{' '}
                   <span className="font-medium">{totalPages}</span> pages
                 </p>
@@ -524,8 +526,8 @@ export default function OrdersManagement() {
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
-                      currentPage === 1 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                      currentPage === 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-50'
                     }`}
                   >
                     <span className="sr-only">Previous</span>
@@ -549,8 +551,8 @@ export default function OrdersManagement() {
                           onClick={() => setCurrentPage(pageNumber)}
                           className={`relative inline-flex items-center px-4 py-2 border ${
                             currentPage === pageNumber
-                              ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600 dark:bg-indigo-900 dark:border-indigo-400 dark:text-indigo-300'
-                              : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                           } text-sm font-medium`}
                         >
                           {pageNumber}
@@ -560,11 +562,11 @@ export default function OrdersManagement() {
                     
                     // Show ellipsis for gaps
                     if (pageNumber === 2 && currentPage > 3) {
-                      return <span key="ellipsis-start" className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-400">...</span>;
+                      return <span key="ellipsis-start" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>;
                     }
                     
                     if (pageNumber === totalPages - 1 && currentPage < totalPages - 2) {
-                      return <span key="ellipsis-end" className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-400">...</span>;
+                      return <span key="ellipsis-end" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>;
                     }
                     
                     return null;
@@ -573,8 +575,8 @@ export default function OrdersManagement() {
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
-                      currentPage === totalPages ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                      currentPage === totalPages ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-50'
                     }`}
                   >
                     <span className="sr-only">Next</span>
@@ -597,30 +599,30 @@ export default function OrdersManagement() {
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={handleCloseModal}></div>
 
             {/* Modal */}
-            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
                       Update Order Status
                     </h3>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      <p className="text-sm text-gray-500 mb-4">
                         Order ID: {selectedOrder.orderReference || selectedOrder._id}
                       </p>
                       <div className="mb-4">
-                        <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
                           Status
                         </label>
                         <select
                           id="status"
                           name="status"
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                           value={newStatus}
                           onChange={(e) => setNewStatus(e.target.value)}
                         >
@@ -629,13 +631,13 @@ export default function OrdersManagement() {
                           <option value="completed">Completed</option>
                           <option value="failed">Failed</option>
                           <option value="refunded">Refunded</option>
-                        </select>
+                          </select>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
                   onClick={handleStatusChange}
@@ -646,7 +648,7 @@ export default function OrdersManagement() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
                 </button>
@@ -664,30 +666,30 @@ export default function OrdersManagement() {
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={handleCloseBulkModal}></div>
 
             {/* Modal */}
-            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                   </div>
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
                       Bulk Update Orders
                     </h3>
                     <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      <p className="text-sm text-gray-500 mb-4">
                         Update status for {selectedOrders.length} selected orders
                       </p>
                       <div className="mb-4">
-                        <label htmlFor="bulkStatus" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label htmlFor="bulkStatus" className="block text-sm font-medium text-gray-700 mb-1">
                           Status
                         </label>
                         <select
                           id="bulkStatus"
                           name="bulkStatus"
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                           value={bulkStatus}
                           onChange={(e) => setBulkStatus(e.target.value)}
                         >
@@ -703,7 +705,7 @@ export default function OrdersManagement() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
                   onClick={handleBulkStatusChange}
@@ -714,7 +716,7 @@ export default function OrdersManagement() {
                 <button
                   type="button"
                   onClick={handleCloseBulkModal}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
                 </button>
@@ -724,4 +726,5 @@ export default function OrdersManagement() {
         </div>
       )}
     </AdminLayout>
-)};
+  );
+}
