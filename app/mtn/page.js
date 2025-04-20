@@ -13,6 +13,7 @@ const BundleFilter = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState(null);
   const [processingOrder, setProcessingOrder] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   const bundleTypes = [
     { id: 'mtnup2u', label: 'MTN Up2U' },
@@ -23,9 +24,20 @@ const BundleFilter = () => {
     const fetchBundles = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
+        const token = localStorage.getItem('igettoken');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await axios.get('https://iget.onrender.com/api/iget/bundle', { headers });
+        
+        // Set bundles from the response
         setBundles(response.data.data);
         setFilteredBundles(response.data.data.filter(bundle => bundle.type === selectedType));
+        
+        // If the API returns userRole, save it
+        if (response.data.userRole) {
+          setUserRole(response.data.userRole);
+        }
+        
         setLoading(false);
       } catch (err) {
         setError('Failed to load bundles. Please try again later.');
@@ -57,17 +69,12 @@ const BundleFilter = () => {
     setPurchaseStatus(null);
   };
   
-  const validatePhone = (phone) => {
-    const phoneRegex = /^\+?[1-9]\d{9,14}$/;
-    return phoneRegex.test(phone);
-  };
-  
   const handlePurchase = async () => {
     setProcessingOrder(true);
     
     try {
       // Get token from localStorage
-      const token = localStorage.getItem('igettoken')
+      const token = localStorage.getItem('igettoken');
       
       if (!token) {
         setPurchaseStatus({
@@ -78,13 +85,12 @@ const BundleFilter = () => {
         return;
       }
       
+      // Use bundleId for the order (preferred approach)
       const response = await axios.post(
         'https://iget.onrender.com/api/orders/placeorder',
         {
-          recipientNumber,
-          capacity: selectedBundle.capacity,
-          price: selectedBundle.price,
-          bundleType: selectedBundle.type
+          bundleId: selectedBundle._id,
+          recipientNumber
         },
         {
           headers: {
@@ -109,6 +115,30 @@ const BundleFilter = () => {
     }
   };
 
+  // Get price to display - use userPrice if available, fall back to standard price
+  const getDisplayPrice = (bundle) => {
+    return bundle.userPrice !== undefined ? bundle.userPrice : bundle.price;
+  };
+
+  // Format price for display
+  const formatPrice = (price) => {
+    return `GH₵ ${parseFloat(price).toFixed(2)}`;
+  };
+
+  // Calculate savings compared to standard price
+  const calculateSavings = (bundle) => {
+    // Only calculate savings if userPrice is lower than standard price
+    if (bundle.userPrice !== undefined && bundle.price !== undefined && bundle.userPrice < bundle.price) {
+      const savings = bundle.price - bundle.userPrice;
+      const savingsPercent = (savings / bundle.price) * 100;
+      return {
+        amount: savings.toFixed(2),
+        percent: savingsPercent.toFixed(1)
+      };
+    }
+    return null;
+  };
+
   if (loading) return (
     <div className="flex justify-center items-center py-20">
       <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-400"></div>
@@ -127,6 +157,14 @@ const BundleFilter = () => {
         <h1 className="text-5xl font-bold text-yellow-400">MTN</h1>
         <h2 className="text-3xl font-bold ml-3">Data Bundles</h2>
       </div>
+
+      {userRole && userRole !== 'user' && (
+        <div className="mb-4 text-center">
+          <div className="inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
+            Viewing prices as: <span className="font-bold capitalize">{userRole}</span>
+          </div>
+        </div>
+      )}
       
       {/* Bundle Type Filter */}
       <div className="mb-8">
@@ -150,35 +188,47 @@ const BundleFilter = () => {
       {/* Bundles Display */}
       {filteredBundles.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredBundles.map((bundle) => (
-            <div
-              key={bundle._id}
-              className="flex flex-col overflow-hidden shadow-md transition-transform duration-300 hover:translate-y-[-5px]"
-            >
-              <div className="flex flex-col items-center justify-center p-5 space-y-3 bg-yellow-400">
-                <h3 className="text-3xl font-bold">MTN</h3>
-                <h3 className="text-xl font-bold">
-                  {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
-                </h3>
-              </div>
-              <div className="grid grid-cols-2 text-white bg-black rounded-b-lg">
-                <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-gray-600">
-                  <p className="text-lg">GH₵ {bundle.price.toFixed(2)}</p>
-                  <p className="text-sm font-bold">Price</p>
-                </div>
-                <div className="flex flex-col items-center justify-center p-3 text-center">
-                  <p className="text-lg">{bundle.validity || "30 Days"}</p>
-                  <p className="text-sm font-bold">Duration</p>
-                </div>
-              </div>
-              <button 
-                className="w-full px-4 py-2 bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
-                onClick={() => openPurchaseModal(bundle)}
+          {filteredBundles.map((bundle) => {
+            const displayPrice = getDisplayPrice(bundle);
+            const savings = calculateSavings(bundle);
+            
+            return (
+              <div
+                key={bundle._id}
+                className="flex flex-col overflow-hidden shadow-md transition-transform duration-300 hover:translate-y-[-5px]"
               >
-                Purchase Bundle
-              </button>
-            </div>
-          ))}
+                <div className="flex flex-col items-center justify-center p-5 space-y-3 bg-yellow-400">
+                  <h3 className="text-3xl font-bold">MTN</h3>
+                  <h3 className="text-xl font-bold">
+                    {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 text-white bg-black rounded-b-lg">
+                  <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-gray-600">
+                    {/* Display userPrice if available */}
+                    <p className="text-lg">{formatPrice(displayPrice)}</p>
+                    
+                    {/* Show savings information if applicable */}
+                    {savings && (
+                      <p className="text-xs text-green-400">Save {savings.percent}%</p>
+                    )}
+                    
+                    <p className="text-sm font-bold">Price</p>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-3 text-center">
+                    <p className="text-lg">{bundle.validity || "30 Days"}</p>
+                    <p className="text-sm font-bold">Duration</p>
+                  </div>
+                </div>
+                <button 
+                  className="w-full px-4 py-2 bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors"
+                  onClick={() => openPurchaseModal(bundle)}
+                >
+                  Purchase Bundle
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="bg-yellow-100 p-10 text-center rounded-lg border border-yellow-400">
@@ -209,8 +259,20 @@ const BundleFilter = () => {
               </div>
               <div className="flex justify-between mb-2">
                 <span className="font-semibold">Price:</span>
-                <span>GH₵ {selectedBundle.price.toFixed(2)}</span>
+                <span>{formatPrice(getDisplayPrice(selectedBundle))}</span>
               </div>
+              
+              {/* Show savings if applicable */}
+              {calculateSavings(selectedBundle) && (
+                <div className="flex justify-between mb-2 text-green-600">
+                  <span className="font-semibold">Your Savings:</span>
+                  <span>
+                    {formatPrice(calculateSavings(selectedBundle).amount)} 
+                    ({calculateSavings(selectedBundle).percent}%)
+                  </span>
+                </div>
+              )}
+              
               <div className="flex justify-between mb-2">
                 <span className="font-semibold">Validity:</span>
                 <span>{selectedBundle.validity || "30 Days"}</span>

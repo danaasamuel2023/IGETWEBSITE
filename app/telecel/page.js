@@ -10,16 +10,29 @@ const TelecelBundleCards = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [processingOrder, setProcessingOrder] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   // Fetch bundles from API
   useEffect(() => {
     const fetchBundles = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
+        
+        // Get token from localStorage for authenticated requests
+        const token = localStorage.getItem('igettoken');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await axios.get('https://iget.onrender.com/api/iget/bundle', { headers });
+        
+        // If the API returns userRole, save it
+        if (response.data.userRole) {
+          setUserRole(response.data.userRole);
+        }
+        
         // Filter for Telecel bundles only
         const telecelBundles = response.data.data.filter(bundle => 
-          bundle.network === 'telecel' || bundle.type === 'Telecel-555 *126#');
+          bundle.network === 'telecel' || bundle.type === 'Telecel-5959');
+        
         setBundles(telecelBundles);
         setFilteredBundles(telecelBundles);
       } catch (err) {
@@ -55,6 +68,30 @@ const TelecelBundleCards = () => {
     return pattern.test(number);
   };
 
+  // Get price to display - use userPrice if available, fall back to standard price
+  const getDisplayPrice = (bundle) => {
+    return bundle.userPrice !== undefined ? bundle.userPrice : bundle.price;
+  };
+
+  // Format price for display
+  const formatPrice = (price) => {
+    return `GH₵ ${parseFloat(price).toFixed(2)}`;
+  };
+
+  // Calculate savings compared to standard price
+  const calculateSavings = (bundle) => {
+    // Only calculate savings if userPrice is lower than standard price
+    if (bundle.userPrice !== undefined && bundle.price !== undefined && bundle.userPrice < bundle.price) {
+      const savings = bundle.price - bundle.userPrice;
+      const savingsPercent = (savings / bundle.price) * 100;
+      return {
+        amount: savings.toFixed(2),
+        percent: savingsPercent.toFixed(1)
+      };
+    }
+    return null;
+  };
+
   const handlePurchase = async (bundle) => {
     // Reset message state
     setMessage({ text: '', type: '' });
@@ -80,15 +117,23 @@ const TelecelBundleCards = () => {
     setProcessingOrder(true);
 
     try {
-      // Call the placeorder endpoint (same as in the MTN and AT components)
+      // Use bundleId for the order if available (preferred)
+      const requestData = bundle._id
+        ? {
+            bundleId: bundle._id,
+            recipientNumber: phoneNumber
+          }
+        : {
+            recipientNumber: phoneNumber,
+            capacity: bundle.capacity,
+            price: getDisplayPrice(bundle), // Use role-specific price
+            bundleType: bundle.type || 'Telecel-5959'
+          };
+      
+      // Call the placeorder endpoint
       const response = await axios.post(
-        'http://localhost:5000/api/orders/placeorder',
-        {
-          recipientNumber: phoneNumber,
-          capacity: bundle.capacity,
-          price: parseFloat(bundle.price),
-          bundleType: bundle.type || 'Telecel-555 *126#'
-        },
+        'https://iget.onrender.com/api/orders/placeorder',
+        requestData,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -136,6 +181,14 @@ const TelecelBundleCards = () => {
         <h1 className="text-3xl font-bold ml-4">Telecel Enterprise Data Bundles</h1>
       </div>
       
+      {userRole && userRole !== 'user' && (
+        <div className="mb-4 text-center">
+          <div className="inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
+            Viewing prices as: <span className="font-bold capitalize">{userRole}</span>
+          </div>
+        </div>
+      )}
+      
       {message.text && (
         <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {message.text}
@@ -155,55 +208,71 @@ const TelecelBundleCards = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredBundles.map((bundle, index) => (
-            <div key={index} className="flex flex-col">
-              <div 
-                className={`flex flex-col bg-red-600 overflow-hidden shadow-md cursor-pointer transition-transform duration-300 hover:translate-y-[-5px] ${selectedBundleIndex === index ? 'rounded-t-lg' : 'rounded-lg'}`}
-                onClick={() => handleSelectBundle(index)}
-              >
-                <div className="flex flex-col items-center justify-center p-5 space-y-3">
-                  <div className="w-20 h-20 flex justify-center items-center">
-                    <TelecelLogo />
+          {filteredBundles.map((bundle, index) => {
+            const displayPrice = getDisplayPrice(bundle);
+            const savings = calculateSavings(bundle);
+            
+            return (
+              <div key={index} className="flex flex-col">
+                <div 
+                  className={`flex flex-col bg-red-600 overflow-hidden shadow-md cursor-pointer transition-transform duration-300 hover:translate-y-[-5px] ${selectedBundleIndex === index ? 'rounded-t-lg' : 'rounded-lg'}`}
+                  onClick={() => handleSelectBundle(index)}
+                >
+                  <div className="flex flex-col items-center justify-center p-5 space-y-3">
+                    <div className="w-20 h-20 flex justify-center items-center">
+                      <TelecelLogo />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">
+                      {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                    </h3>
                   </div>
-                  <h3 className="text-xl font-bold text-white">
-                    {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
-                  </h3>
+                  <div className="grid grid-cols-2 text-white bg-black"
+                       style={{ borderRadius: selectedBundleIndex === index ? '0' : '0 0 0.5rem 0.5rem' }}>
+                    <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-gray-600">
+                      <p className="text-lg">{formatPrice(displayPrice)}</p>
+                      {savings && (
+                        <p className="text-xs text-green-400">Save {savings.percent}%</p>
+                      )}
+                      <p className="text-sm font-bold">Price</p>
+                    </div>
+                    <div className="flex flex-col items-center justify-center p-3 text-center">
+                      <p className="text-lg">{bundle.validity || "30 Days"}</p>
+                      <p className="text-sm font-bold">Duration</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 text-white bg-black"
-                     style={{ borderRadius: selectedBundleIndex === index ? '0' : '0 0 0.5rem 0.5rem' }}>
-                  <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-gray-600">
-                    <p className="text-lg">GH₵ {parseFloat(bundle.price).toFixed(2)}</p>
-                    <p className="text-sm font-bold">Price</p>
+                
+                {selectedBundleIndex === index && (
+                  <div className="bg-red-600 p-4 rounded-b-lg shadow-md">
+                    <div className="mb-4">
+                      <input
+                        type="tel"
+                        className="w-full px-4 py-2 rounded bg-red-500 text-white placeholder-red-200 border border-red-400 focus:outline-none focus:border-red-300"
+                        placeholder="Enter recipient number (e.g., 0271234567)"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                      />
+                    </div>
+                    
+                    {/* Show savings if applicable in purchase details */}
+                    {savings && (
+                      <div className="p-2 mb-3 bg-green-500 bg-opacity-25 rounded text-white text-sm">
+                        <p>Role-based pricing: You save {formatPrice(savings.amount)} ({savings.percent}%)</p>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={() => handlePurchase(bundle)}
+                      className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed"
+                      disabled={processingOrder}
+                    >
+                      {processingOrder ? 'Processing...' : 'Purchase'}
+                    </button>
                   </div>
-                  <div className="flex flex-col items-center justify-center p-3 text-center">
-                    <p className="text-lg">{bundle.validity || "30 Days"}</p>
-                    <p className="text-sm font-bold">Duration</p>
-                  </div>
-                </div>
+                )}
               </div>
-              
-              {selectedBundleIndex === index && (
-                <div className="bg-red-600 p-4 rounded-b-lg shadow-md">
-                  <div className="mb-4">
-                    <input
-                      type="tel"
-                      className="w-full px-4 py-2 rounded bg-red-500 text-white placeholder-red-200 border border-red-400 focus:outline-none focus:border-red-300"
-                      placeholder="Enter recipient number (e.g., 0271234567)"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    onClick={() => handlePurchase(bundle)}
-                    className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-green-400 disabled:cursor-not-allowed"
-                    disabled={processingOrder}
-                  >
-                    {processingOrder ? 'Processing...' : 'Purchase'}
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
