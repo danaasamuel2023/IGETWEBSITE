@@ -350,7 +350,7 @@ const BundlePriceList = () => {
                           <div className="flex flex-col">
                             <div className="flex justify-between items-center">
                               <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                                {(bundle.capacity)} GB
                               </span>
                               <button
                                 onClick={() => startEditing(bundle)}
