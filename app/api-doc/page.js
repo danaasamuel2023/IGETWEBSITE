@@ -124,8 +124,8 @@ export default function ApiDocumentation() {
                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">capacity</td>
                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Number</td>
                         <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Data bundle size in megabytes (MB).<br/>
-                          Common values: 100, 250, 500, 1000, 2000
+                          Data bundle size in  (GB).<br/>
+                          Common values: 1, 2, 5, 10, 20
                         </td>
                       </tr>
                       <tr>
@@ -152,7 +152,7 @@ export default function ApiDocumentation() {
       "orderReference": "ORD-123456",
       "recipientNumber": "0201234567",
       "bundleType": "mtnup2u",
-      "capacity": 100,
+      "capacity": 1,
       "price": 5.99,
       "status": "pending",
       "createdAt": "2025-03-16T12:34:56.789Z"
@@ -223,7 +223,7 @@ export default function ApiDocumentation() {
   -H "X-API-Key: your_api_key_here" \\
   -d '{
     "recipientNumber": "0201234567",
-    "capacity": 100,
+    "capacity": 1,
     "bundleType": "mtnup2u"
   }'`}
                   </pre>
@@ -308,7 +308,7 @@ export default function ApiDocumentation() {
       "orderReference": "ORD-123456",
       "recipientNumber": "0201234567",
       "bundleType": "mtnup2u",
-      "capacity": 100,
+      "capacity": 1,
       "price": 5.99,
       "status": "completed",
       "createdAt": "2025-03-16T12:34:56.789Z",

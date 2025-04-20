@@ -157,7 +157,7 @@ export default function UserOrders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {order.capacity ? `${order.capacity} MB` : 'N/A'} 
+                          {order.capacity ? `${order.capacity} GB` : 'N/A'} 
                           {order.bundleType && ` (${order.bundleType})`}
                         </div>
                         {order.recipientNumber && (
