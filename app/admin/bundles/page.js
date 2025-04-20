@@ -289,14 +289,14 @@ const BundleManagement = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 text-black dark:text-white">Capacity (MB)</label>
+                <label className="block text-sm font-medium mb-1 text-black dark:text-white">Capacity (GB)</label>
                 <input
                   type="text"
                   name="capacity"
                   value={bundleForm.capacity}
                   onChange={handleFormChange}
                   className="w-full border rounded p-2 bg-white dark:bg-gray-700 text-black dark:text-white"
-                  placeholder="e.g. 5000"
+                  placeholder="e.g. 5"
                   required
                 />
               </div>

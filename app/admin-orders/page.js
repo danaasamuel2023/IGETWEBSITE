@@ -458,7 +458,7 @@ export default function OrdersManagement() {
                           {order.recipientNumber || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {order.capacity ? (order.capacity/1000) : 'N/A'} 
+                          {order.capacity ? (order.capacity) : 'N/A'} 
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           ₵{order.price?.toFixed(2) || '0.00'}
