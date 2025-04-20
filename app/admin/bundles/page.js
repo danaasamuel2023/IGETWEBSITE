@@ -87,32 +87,6 @@ const BundleManagement = () => {
       ...bundleForm,
       [name]: value
     });
-    
-    // If standard price changes, update role prices if they're empty or the same as the old price
-    if (name === 'price') {
-      const newPrice = parseFloat(value) || 0;
-      setBundleForm(prev => {
-        const newRolePricing = { ...prev.rolePricing };
-        
-        // Update user role price to match standard price
-        newRolePricing.user = newPrice;
-        
-        // For other roles, only update if they were previously empty or matched the old price
-        Object.keys(newRolePricing).forEach(role => {
-          if (role !== 'user' && (newRolePricing[role] === '' || newRolePricing[role] === prev.price)) {
-            // Default discounts: admin (30%), agent (15%), Editor (10%)
-            if (role === 'admin') newRolePricing[role] = (newPrice * 0.7).toFixed(2);
-            if (role === 'agent') newRolePricing[role] = (newPrice * 0.85).toFixed(2);
-            if (role === 'Editor') newRolePricing[role] = (newPrice * 0.9).toFixed(2);
-          }
-        });
-        
-        return {
-          ...prev,
-          rolePricing: newRolePricing
-        };
-      });
-    }
   };
   
   // Handle role pricing changes
@@ -136,19 +110,17 @@ const BundleManagement = () => {
   const startEditing = (bundle) => {
     setEditingBundle(bundle._id);
     
-    // Initialize role pricing from the bundle or with defaults
-    const rolePricing = bundle.rolePricing || {
-      admin: bundle.price * 0.7,  // 30% discount
-      user: bundle.price,          // Standard price
-      agent: bundle.price * 0.85,  // 15% discount
-      Editor: bundle.price * 0.9   // 10% discount
-    };
-    
+    // Initialize form with bundle data
     setBundleForm({
       type: selectedType,
       price: bundle.price,
       capacity: bundle.capacity,
-      rolePricing
+      rolePricing: bundle.rolePricing || {
+        admin: '',
+        user: '',
+        agent: '',
+        Editor: ''
+      }
     });
   };
   
@@ -248,13 +220,6 @@ const BundleManagement = () => {
     }
   };
   
-  // Calculate discount percentage
-  const calculateDiscount = (rolePrice, standardPrice) => {
-    if (!rolePrice || !standardPrice) return 0;
-    const discount = ((standardPrice - rolePrice) / standardPrice) * 100;
-    return discount.toFixed(1);
-  };
-  
   // Cancel editing
   const cancelEdit = () => {
     setEditingBundle(null);
@@ -274,24 +239,28 @@ const BundleManagement = () => {
   return (
     <AdminLayout>
       <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">Bundle Management</h1>
+        <h1 className="text-2xl font-bold mb-4 text-black dark:text-white">Bundle Management</h1>
         
         {/* Alert Message */}
         {message.text && (
-          <div className={`p-3 mb-4 rounded ${message.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          <div className={`p-3 mb-4 rounded ${
+            message.type === 'error' 
+              ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200' 
+              : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200'
+          }`}>
             {message.text}
           </div>
         )}
         
         <div className="grid md:grid-cols-2 gap-6">
           {/* Left Column - Bundle Form */}
-          <div className="bg-white p-4 rounded shadow">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Bundle Type</label>
+              <label className="block text-sm font-medium mb-1 text-black dark:text-white">Bundle Type</label>
               <select
                 value={selectedType}
                 onChange={handleTypeChange}
-                className="w-full border rounded p-2"
+                className="w-full border rounded p-2 bg-white dark:bg-gray-700 text-black dark:text-white"
               >
                 <option value="">Select a type</option>
                 {bundleTypes.map(type => (
@@ -301,18 +270,18 @@ const BundleManagement = () => {
             </div>
             
             <form onSubmit={saveBundle} className="mt-4">
-              <h2 className="text-lg font-medium mb-3">
+              <h2 className="text-lg font-medium mb-3 text-black dark:text-white">
                 {editingBundle ? 'Edit Bundle' : 'Add New Bundle'}
               </h2>
               
               <div className="mb-3">
-                <label className="block text-sm font-medium mb-1">Standard Price</label>
+                <label className="block text-sm font-medium mb-1 text-black dark:text-white">Standard Price</label>
                 <input
                   type="number"
                   name="price"
                   value={bundleForm.price}
                   onChange={handleFormChange}
-                  className="w-full border rounded p-2"
+                  className="w-full border rounded p-2 bg-white dark:bg-gray-700 text-black dark:text-white"
                   step="0.01"
                   min="0"
                   required
@@ -320,13 +289,13 @@ const BundleManagement = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">Capacity (MB)</label>
+                <label className="block text-sm font-medium mb-1 text-black dark:text-white">Capacity (MB)</label>
                 <input
                   type="text"
                   name="capacity"
                   value={bundleForm.capacity}
                   onChange={handleFormChange}
-                  className="w-full border rounded p-2"
+                  className="w-full border rounded p-2 bg-white dark:bg-gray-700 text-black dark:text-white"
                   placeholder="e.g. 5000"
                   required
                 />
@@ -334,32 +303,28 @@ const BundleManagement = () => {
 
               {/* Role-Based Pricing Section */}
               <div className="mb-4">
-                <h3 className="text-md font-medium mb-2">Role-Based Pricing</h3>
+                <h3 className="text-md font-medium mb-2 text-black dark:text-white">Role-Based Pricing</h3>
                 <div className="space-y-2">
                   {userRoles.map(role => (
-                    <div key={role.id} className="flex items-center space-x-2">
-                      <div className="w-20">
-                        <label className="block text-sm font-medium">{role.label}</label>
+                    <div key={role.id} className="flex items-center">
+                      <div className="w-24">
+                        <label className="block text-sm font-medium text-black dark:text-white">{role.label} Price:</label>
                       </div>
                       <input
                         type="number"
                         value={bundleForm.rolePricing[role.id]}
                         onChange={(e) => handleRolePriceChange(role.id, e.target.value)}
-                        className="border rounded p-1 w-20"
+                        className="border rounded p-1 w-24 ml-2 bg-white dark:bg-gray-700 text-black dark:text-white"
                         step="0.01"
                         min="0"
                         required
+                        placeholder="0.00"
                       />
-                      {bundleForm.price && bundleForm.rolePricing[role.id] && (
-                        <span className="text-sm text-gray-600">
-                          {calculateDiscount(bundleForm.rolePricing[role.id], bundleForm.price)}% off
-                        </span>
-                      )}
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Note: User role price defaults to standard price. Other roles have default discounts.
+                <p className="text-xs mt-1 text-gray-600 dark:text-gray-300">
+                  Note: Enter prices manually for all roles.
                 </p>
               </div>
               
@@ -367,7 +332,11 @@ const BundleManagement = () => {
                 <button
                   type="submit"
                   disabled={loading || !selectedType}
-                  className={`px-4 py-2 rounded ${loading || !selectedType ? 'bg-gray-300' : 'bg-blue-600 text-white'}`}
+                  className={`px-4 py-2 rounded ${
+                    loading || !selectedType 
+                      ? 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-400' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800'
+                  }`}
                 >
                   {loading ? 'Processing...' : editingBundle ? 'Update Bundle' : 'Add Bundle'}
                 </button>
@@ -376,7 +345,7 @@ const BundleManagement = () => {
                   <button
                     type="button"
                     onClick={cancelEdit}
-                    className="px-4 py-2 bg-gray-200 rounded"
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded"
                   >
                     Cancel
                   </button>
@@ -386,62 +355,67 @@ const BundleManagement = () => {
           </div>
           
           {/* Right Column - Bundle List */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="text-lg font-medium mb-3">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+            <h2 className="text-lg font-medium mb-3 text-black dark:text-white">
               {selectedType ? `${selectedType} Bundles` : 'Select a bundle type'}
             </h2>
             
-            {loading && <p className="text-gray-500">Loading...</p>}
+            {loading && <p className="text-gray-500 dark:text-gray-400">Loading...</p>}
             
             {!loading && bundles.length === 0 && selectedType && (
-              <p className="text-gray-500">No active bundles found.</p>
+              <p className="text-gray-500 dark:text-gray-400">No active bundles found.</p>
             )}
             
             {!loading && bundles.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50">
-                      <th className="p-2 text-left">Capacity</th>
-                      <th className="p-2 text-left">Standard Price</th>
-                      <th className="p-2 text-left">Role Prices</th>
-                      <th className="p-2 text-center">Actions</th>
+                    <tr className="bg-gray-50 dark:bg-gray-700">
+                      <th className="p-2 text-left text-black dark:text-white">Capacity</th>
+                      <th className="p-2 text-left text-black dark:text-white">Standard Price</th>
+                      <th className="p-2 text-left text-black dark:text-white">Role Prices</th>
+                      <th className="p-2 text-center text-black dark:text-white">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {bundles.map((bundle) => (
-                      <tr key={bundle._id} className="border-t">
-                        <td className="p-2">{(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB</td>
-                        <td className="p-2">GH₵ {parseFloat(bundle.price).toFixed(2)}</td>
+                      <tr key={bundle._id} className="border-t border-gray-200 dark:border-gray-700">
+                        <td className="p-2 text-black dark:text-white">
+                          {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                        </td>
+                        <td className="p-2 text-black dark:text-white">
+                          GH₵ {parseFloat(bundle.price).toFixed(2)}
+                        </td>
                         <td className="p-2">
                           {bundle.rolePricing ? (
                             <div className="text-xs space-y-1">
                               {Object.entries(bundle.rolePricing).map(([role, price]) => (
                                 <div key={role} className="flex items-center">
-                                  <span className="font-semibold capitalize w-14">{role}:</span>
-                                  <span>GH₵ {parseFloat(price).toFixed(2)}</span>
-                                  {role !== 'user' && (
-                                    <span className="ml-1 text-green-600">
-                                      ({calculateDiscount(price, bundle.price)}% off)
-                                    </span>
-                                  )}
+                                  <span className="font-semibold capitalize w-14 text-black dark:text-white">
+                                    {role}:
+                                  </span>
+                                  <span className="text-black dark:text-white">
+                                    GH₵ {parseFloat(price).toFixed(2)}
+                                  </span>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-500">Standard pricing</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Standard pricing
+                            </span>
                           )}
                         </td>
                         <td className="p-2 text-center">
                           <button
                             onClick={() => startEditing(bundle)}
-                            className="text-blue-600 mr-2"
+                            className="text-blue-600 dark:text-blue-400 mr-2"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteBundle(bundle._id)}
-                            className="text-red-600"
+                            className="text-red-600 dark:text-red-400"
                           >
                             Remove
                           </button>
