@@ -17,7 +17,7 @@ export default function AdminLayout({ children }) {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('igettoken');
-        const userRole = JSON.parse(localStorage.getItem('userData')) 
+        const userDataStr = localStorage.getItem('userData');
         
         if (!token) {
           router.push('/login?redirect=' + encodeURIComponent(router.asPath));
@@ -25,41 +25,50 @@ export default function AdminLayout({ children }) {
         }
 
         // If userRole is stored in local storage, use it for quick check
-        if (userRole.role === 'admin') {
-          setIsAdmin(true);
-          setIsAuthenticated(true);
-        } else {
-          // Verify with backend if local storage doesn't confirm admin status
+        if (userDataStr) {
           try {
-            const response = await axios.get('http://localhost:5000/api/auth/check-admin', {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            });
-            
-            if (response.data.isAdmin) {
+            const userData = JSON.parse(userDataStr);
+            if (userData.role === 'admin') {
               setIsAdmin(true);
-              localStorage.setItem('userRole', 'admin');
-            } else {
-              // Not an admin, redirect to regular dashboard
-              router.push('/');
+              setIsAuthenticated(true);
+              setIsLoading(false);
               return;
             }
-            
-            setIsAuthenticated(true);
-          } catch (error) {
-            console.error('Error checking admin status:', error);
-            // Handle expired or invalid token
-            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-              localStorage.removeItem('token');
-              localStorage.removeItem('userRole');
-              router.push('/login?redirect=' + encodeURIComponent(router.asPath));
-            } else {
-              // For other errors, assume not admin
-              router.push('/');
+          } catch (e) {
+            console.error('Error parsing userData from localStorage:', e);
+          }
+        }
+
+        // Verify with backend if local storage doesn't confirm admin status
+        try {
+          const response = await axios.get('http://localhost:5000/api/auth/check-admin', {
+            headers: {
+              Authorization: `Bearer ${token}`
             }
+          });
+          
+          if (response.data.isAdmin) {
+            setIsAdmin(true);
+            localStorage.setItem('userRole', 'admin');
+          } else {
+            // Not an admin, redirect to regular dashboard
+            router.push('/');
             return;
           }
+          
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          // Handle expired or invalid token
+          if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            localStorage.removeItem('igettoken');
+            localStorage.removeItem('userData');
+            router.push('/login?redirect=' + encodeURIComponent(router.asPath));
+          } else {
+            // For other errors, assume not admin
+            router.push('/');
+          }
+          return;
         }
       } finally {
         setIsLoading(false);
@@ -71,7 +80,7 @@ export default function AdminLayout({ children }) {
 
   const handleLogout = () => {
     localStorage.removeItem('igettoken');
-    localStorage.removeItem('userRole');
+    localStorage.removeItem('userData');
     router.push('/Signin');
   };
 
@@ -95,14 +104,14 @@ export default function AdminLayout({ children }) {
       {/* Mobile sidebar backdrop - only show on mobile when sidebar is open */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 md:hidden bg-gray-600 bg-opacity-75"
+          className="fixed inset-0 z-10 md:hidden bg-gray-600 bg-opacity-75"
           onClick={toggleSidebar}
         ></div>
       )}
       
       {/* Sidebar - collapsed state controlled by sidebarOpen */}
       <div 
-        className={`fixed inset-y-0 left-0 z-50 bg-gray-800 transition-all duration-300 transform
+        className={`fixed inset-y-0 left-0 z-20 bg-gray-800 transition-all duration-300 transform
           ${sidebarOpen ? 'md:w-64 w-64' : 'w-0 md:w-16'} overflow-hidden`}
       >
         {/* Sidebar Header with Toggle Button */}
