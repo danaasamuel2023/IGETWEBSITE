@@ -7,11 +7,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import AdminLayout from '@/components/adminWraper';
 
-// Authentication wrapper component
-
 export default function UsersManagement() {
   const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [depositAmount, setDepositAmount] = useState('');
@@ -36,11 +34,6 @@ export default function UsersManagement() {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
       });
-      
-      // Log the response to inspect its structure
-      console.log('API Response:', response);
-      console.log('Response data type:', typeof response.data);
-      console.log('Is array:', Array.isArray(response.data));
       
       // Check if response.data itself is an array
       if (Array.isArray(response.data)) {
@@ -76,7 +69,8 @@ export default function UsersManagement() {
     setShowModal(true);
     
     if (type === 'changeRole') {
-      setNewRole(user.role);
+      // Initialize with the user's current role
+      setNewRole(user.role || 'user');
     }
   };
 
@@ -86,6 +80,7 @@ export default function UsersManagement() {
     setDepositAmount('');
     setDepositDescription('');
     setModalType('');
+    setError(null); // Clear any errors when closing modal
   };
 
   const handleDeleteUser = async () => {
@@ -105,7 +100,7 @@ export default function UsersManagement() {
 
   const handleToggleUserStatus = async () => {
     try {
-      const response = await axios.patch(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/status`, {}, {
+      await axios.patch(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/status`, {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -142,7 +137,7 @@ export default function UsersManagement() {
   };
 
   const handleDeposit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     
     if (!depositAmount || isNaN(depositAmount) || parseFloat(depositAmount) <= 0) {
       setError('Please enter a valid amount');
@@ -162,7 +157,7 @@ export default function UsersManagement() {
       // Update the user's wallet balance in the UI
       setUsers(users.map(user => 
         user._id === selectedUser._id 
-          ? { ...user, wallet: { ...user.wallet, balance: user.wallet.balance + parseFloat(depositAmount) } } 
+          ? { ...user, wallet: { ...user.wallet, balance: (user.wallet?.balance || 0) + parseFloat(depositAmount) } } 
           : user
       ));
       
@@ -173,8 +168,17 @@ export default function UsersManagement() {
     }
   };
 
-  const handleChangeRole = async () => {
+  const handleChangeRole = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!newRole) {
+      setError('Please select a role');
+      return;
+    }
+    
     try {
+      console.log(`Changing role for user ${selectedUser._id} to ${newRole}`);
+      
       await axios.patch(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/role`, {
         role: newRole
       }, {
@@ -183,6 +187,7 @@ export default function UsersManagement() {
         }
       });
       
+      // Update the user in the local state
       setUsers(users.map(user => 
         user._id === selectedUser._id ? { ...user, role: newRole } : user
       ));
@@ -197,9 +202,9 @@ export default function UsersManagement() {
   const filteredUsers = users.filter(user => {
     const query = searchQuery.toLowerCase();
     return (
-      user.username.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      user.role.toLowerCase().includes(query) ||
+      user.username?.toLowerCase().includes(query) ||
+      user.email?.toLowerCase().includes(query) ||
+      user.role?.toLowerCase().includes(query) ||
       (user.phone && user.phone.toLowerCase().includes(query))
     );
   });
@@ -270,7 +275,7 @@ export default function UsersManagement() {
                           ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
                             user.role === 'agent' ? 'bg-green-100 text-green-800' : 
                             'bg-blue-100 text-blue-800'}`}>
-                          {user.role}
+                          {user.role || 'user'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -280,7 +285,7 @@ export default function UsersManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.wallet?.balance.toFixed(2)} {user.wallet?.currency}
+                        {(user.wallet?.balance || 0).toFixed(2)} {user.wallet?.currency || 'USD'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex flex-col sm:flex-row gap-2">
@@ -361,7 +366,7 @@ export default function UsersManagement() {
                     </div>
                   )}
 
-{modalType === 'deleteApiKey' && (
+                  {modalType === 'deleteApiKey' && (
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                       <h3 className="text-lg leading-6 font-medium text-gray-900">Delete API Key</h3>
                       <div className="mt-2">
@@ -381,7 +386,7 @@ export default function UsersManagement() {
                         </p>
                         <form onSubmit={handleDeposit}>
                           <div className="mb-4">
-                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount ({selectedUser.wallet?.currency})</label>
+                            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount ({selectedUser.wallet?.currency || 'USD'})</label>
                             <input
                               type="number"
                               step="0.01"
@@ -416,19 +421,21 @@ export default function UsersManagement() {
                         <p className="text-sm text-gray-500 mb-4">
                           Change role for user "{selectedUser.username}".
                         </p>
-                        <div className="mb-4">
-                          <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
-                          <select
-                            id="role"
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                            value={newRole}
-                            onChange={(e) => setNewRole(e.target.value)}
-                          >
-                            <option value="user">User</option>
-                            <option value="agent">Agent</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        </div>
+                        <form onSubmit={handleChangeRole}>
+                          <div className="mb-4">
+                            <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+                            <select
+                              id="role"
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                              value={newRole}
+                              onChange={(e) => setNewRole(e.target.value)}
+                            >
+                              <option value="user">User</option>
+                              <option value="agent">Agent</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </div>
+                        </form>
                       </div>
                     </div>
                   )}
