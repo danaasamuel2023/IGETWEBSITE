@@ -4,6 +4,7 @@ import axios from 'axios';
 import Head from 'next/head';
 import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
+import { Phone, User } from 'lucide-react'; // Import Lucide icons
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
@@ -270,7 +271,7 @@ export default function OrdersManagement() {
         <title>Orders Management | Admin Dashboard</title>
       </Head>
       
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto bg-white dark:bg-gray-900">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
           <div className="flex flex-wrap gap-2">
@@ -446,20 +447,53 @@ export default function OrdersManagement() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {order.orderReference || order._id.substring(0, 8) + '...'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {order.bundleType || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {order.recipientNumber || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {order.capacity ? (order.capacity) : 'N/A'} 
-                        </td>
+                        
+                        {/* Special display for AfA-registration bundle type */}
+                        {order.bundleType === 'AfA-registration' ? (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <User className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {order.metadata?.fullName || order.user?.username || 'N/A'}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {order.bundleType}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {order.phoneNumber || order.recipientNumber || order.user?.phone || 'N/A'}
+                                </div>
+                              </div>
+                            </td>
+                            {/* Empty capacity cell for AfA registrations */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              -
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {order.bundleType}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {order.recipientNumber || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {order.capacity ? (order.capacity) : 'N/A'} 
+                            </td>
+                          </>
+                        )}
+                        
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           ₵{order.price?.toFixed(2) || '0.00'}
                         </td>
@@ -580,5 +614,4 @@ export default function OrdersManagement() {
       </div>
 
     </AdminLayout>
-  );
-}
+  )};
