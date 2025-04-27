@@ -85,12 +85,27 @@ const BundleFilter = () => {
         return;
       }
       
-      // Use bundleId for the order (preferred approach)
+      // Make sure we have all the required fields
+      if (!selectedBundle || !recipientNumber) {
+        setPurchaseStatus({
+          success: false,
+          message: 'Bundle details and recipient number are required'
+        });
+        setProcessingOrder(false);
+        return;
+      }
+      
+      // Get the correct price - user price if available, otherwise standard price
+      const price = selectedBundle.userPrice !== undefined ? selectedBundle.userPrice : selectedBundle.price;
+      
+      // Send the required fields that the backend expects
       const response = await axios.post(
         'https://iget.onrender.com/api/orders/placeorder',
         {
-          bundleId: selectedBundle._id,
-          recipientNumber
+          recipientNumber: recipientNumber,
+          capacity: selectedBundle.capacity,
+          price: price,
+          bundleType: selectedBundle.type
         },
         {
           headers: {
@@ -106,6 +121,7 @@ const BundleFilter = () => {
       });
       
     } catch (err) {
+      console.error("Purchase error:", err);
       setPurchaseStatus({
         success: false,
         message: err.response?.data?.message || 'Failed to process your purchase. Please try again.'
@@ -123,20 +139,6 @@ const BundleFilter = () => {
   // Format price for display
   const formatPrice = (price) => {
     return `GH₵ ${parseFloat(price).toFixed(2)}`;
-  };
-
-  // Calculate savings compared to standard price
-  const calculateSavings = (bundle) => {
-    // Only calculate savings if userPrice is lower than standard price
-    if (bundle.userPrice !== undefined && bundle.price !== undefined && bundle.userPrice < bundle.price) {
-      const savings = bundle.price - bundle.userPrice;
-      const savingsPercent = (savings / bundle.price) * 100;
-      return {
-        amount: savings.toFixed(2),
-        percent: savingsPercent.toFixed(1)
-      };
-    }
-    return null;
   };
 
   if (loading) return (
@@ -190,7 +192,6 @@ const BundleFilter = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredBundles.map((bundle) => {
             const displayPrice = getDisplayPrice(bundle);
-            const savings = calculateSavings(bundle);
             
             return (
               <div
@@ -207,16 +208,10 @@ const BundleFilter = () => {
                   <div className="flex flex-col items-center justify-center p-3 text-center border-r border-r-gray-600">
                     {/* Display userPrice if available */}
                     <p className="text-lg">{formatPrice(displayPrice)}</p>
-                    
-                    {/* Show savings information if applicable */}
-                    {savings && (
-                      <p className="text-xs text-green-400">Save {savings.percent}%</p>
-                    )}
-                    
                     <p className="text-sm font-bold">Price</p>
                   </div>
                   <div className="flex flex-col items-center justify-center p-3 text-center">
-                    <p className="text-lg">{bundle.validity || "30 Days"}</p>
+                    <p className="text-lg">{bundle.validity || "90 Days"}</p>
                     <p className="text-sm font-bold">Duration</p>
                   </div>
                 </div>
@@ -238,13 +233,13 @@ const BundleFilter = () => {
       
       {/* Purchase Modal */}
       {isModalOpen && selectedBundle && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Purchase Bundle</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl border border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Purchase Bundle</h2>
               <button 
                 onClick={closePurchaseModal}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -252,36 +247,24 @@ const BundleFilter = () => {
               </button>
             </div>
             
-            <div className="mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="font-semibold">Bundle:</span>
-                <span>{(selectedBundle.capacity / 1000).toFixed(selectedBundle.capacity % 1000 === 0 ? 0 : 1)} GB</span>
+            <div className="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <div className="flex justify-between mb-3">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Bundle:</span>
+                <span className="text-black dark:text-white font-medium">{(selectedBundle.capacity / 1000).toFixed(selectedBundle.capacity % 1000 === 0 ? 0 : 1)} GB</span>
               </div>
-              <div className="flex justify-between mb-2">
-                <span className="font-semibold">Price:</span>
-                <span>{formatPrice(getDisplayPrice(selectedBundle))}</span>
+              <div className="flex justify-between mb-3">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Price:</span>
+                <span className="text-black dark:text-white font-medium">{formatPrice(getDisplayPrice(selectedBundle))}</span>
               </div>
-              
-              {/* Show savings if applicable */}
-              {calculateSavings(selectedBundle) && (
-                <div className="flex justify-between mb-2 text-green-600">
-                  <span className="font-semibold">Your Savings:</span>
-                  <span>
-                    {formatPrice(calculateSavings(selectedBundle).amount)} 
-                    ({calculateSavings(selectedBundle).percent}%)
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex justify-between mb-2">
-                <span className="font-semibold">Validity:</span>
-                <span>{selectedBundle.validity || "30 Days"}</span>
+              <div className="flex justify-between mb-3">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Validity:</span>
+                <span className="text-black dark:text-white font-medium">{selectedBundle.validity || "90 Days"}</span>
               </div>
             </div>
             
             {!purchaseStatus?.success && (
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">
+              <div className="mb-5">
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2">
                   Recipient Phone Number
                 </label>
                 <input
@@ -289,18 +272,18 @@ const BundleFilter = () => {
                   value={recipientNumber}
                   onChange={(e) => setRecipientNumber(e.target.value)}
                   placeholder="e.g. +233123456789"
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  className="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 dark:text-white dark:bg-gray-600 dark:border-gray-500 leading-tight focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>
             )}
             
             {purchaseStatus && (
-              <div className={`p-3 mb-4 rounded ${
-                purchaseStatus.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              <div className={`p-4 mb-4 rounded-lg ${
+                purchaseStatus.success ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
               }`}>
-                <p>{purchaseStatus.message}</p>
+                <p className="font-medium">{purchaseStatus.message}</p>
                 {purchaseStatus.success && purchaseStatus.orderDetails && (
-                  <div className="mt-2 text-sm">
+                  <div className="mt-3 text-sm space-y-1">
                     <p><strong>Order Reference:</strong> {purchaseStatus.orderDetails.order.orderReference}</p>
                     <p><strong>Transaction Ref:</strong> {purchaseStatus.orderDetails.transaction.reference}</p>
                     <p><strong>New Balance:</strong> GH₵ {purchaseStatus.orderDetails.walletBalance.toFixed(2)}</p>
@@ -313,10 +296,10 @@ const BundleFilter = () => {
               <button
                 onClick={handlePurchase}
                 disabled={processingOrder || !recipientNumber}
-                className={`w-full py-2 px-4 rounded font-bold text-white ${
+                className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
                   processingOrder || !recipientNumber
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700'
+                    : 'bg-yellow-500 hover:bg-yellow-600'
                 }`}
               >
                 {processingOrder ? 'Processing...' : 'Confirm Purchase'}
@@ -326,7 +309,7 @@ const BundleFilter = () => {
             {purchaseStatus?.success && (
               <button
                 onClick={closePurchaseModal}
-                className="w-full py-2 px-4 rounded font-bold text-white bg-gray-600 hover:bg-gray-700"
+                className="w-full py-3 px-4 rounded-lg font-bold text-white bg-gray-600 hover:bg-gray-700 transition-colors"
               >
                 Close
               </button>

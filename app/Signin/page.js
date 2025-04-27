@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
-import logo from '../../images/IgetWlogo.jpg'
+import logo from '../../images/igetLogo - Copy.jpg'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -126,10 +126,13 @@ export default function Auth() {
     setError('');
   };
 
-  // Improved conditional classes with better contrast for text visibility
-  const pageClass = isDarkMode 
-    ? "min-h-screen flex items-center justify-center bg-gray-900" 
-    : "min-h-screen flex items-center justify-center bg-gray-100";
+  // Updated classes to extend container to edges and match the black navbar
+  // Removed min-h-screen from pageClass and added it to containerClass
+  const containerClass = isDarkMode 
+    ? "min-h-screen bg-gray-900 flex flex-col pt-0" 
+    : "min-h-screen bg-white flex flex-col pt-0";
+  
+  const pageClass = "flex-grow flex items-center justify-center";
     
   const cardClass = isDarkMode
     ? "bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-md"
@@ -162,139 +165,141 @@ export default function Auth() {
   const buttonClass = "w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium";
 
   return (
-    <div className={pageClass}>
+    <div className={containerClass}>
       <Head>
         <title>{isLogin ? 'Login' : 'Sign Up'} | IGet</title>
         <meta name="description" content="Authentication page" />
       </Head>
       
-      <div className={cardClass}>
-        <div className="flex justify-center mb-6">
-          {/* Company Logo */}
-          <div className="relative w-48 h-16">
-            <Image 
-              src={logo} 
-              alt="Iget Logo" 
-              layout="fill"
-              objectFit="contain"
-              priority
-            />
+      <div className={pageClass}>
+        <div className={cardClass}>
+          <div className="flex justify-center mb-6">
+            {/* Company Logo */}
+            <div className="relative w-48 h-16">
+              <Image 
+                src={logo} 
+                alt="Iget Logo" 
+                layout="fill"
+                objectFit="contain"
+                priority
+              />
+            </div>
           </div>
-        </div>
 
-        <h1 className={headingClass}>
-          {isLogin ? 'Login to Your Account' : 'Create an Account'}
-        </h1>
-        
-        {error && (
-          <div className={errorClass}>
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="username" className={labelClass}>
-              Username or Email
-            </label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              className={inputClass}
-              placeholder="Enter your username or email"
-            />
-          </div>
+          <h1 className={headingClass}>
+            {isLogin ? 'Login to Your Account' : 'Create an Account'}
+          </h1>
           
-          {!isLogin && (
-            <>
-              <div className="mb-4">
-                <label htmlFor="email" className={labelClass}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={inputClass}
-                  placeholder="Enter your email"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="phone" className={labelClass}>
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className={inputClass}
-                  placeholder="Enter your phone number"
-                />
-              </div>
-            </>
-          )}
-          
-          <div className="mb-6">
-            <label htmlFor="password" className={labelClass}>
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              className={inputClass}
-              placeholder="Enter your password"
-            />
-          </div>
-          
-          <button
-            type="submit"
-            className={buttonClass}
-            disabled={loading}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              isLogin ? 'Login' : 'Sign Up'
-            )}
-          </button>
-          
-          {isLogin && (
-            <div className="mt-4 text-center">
-              <Link href="/forgot-password" className={linkTextClass}>
-                Forgot password?
-              </Link>
+          {error && (
+            <div className={errorClass}>
+              {error}
             </div>
           )}
-        </form>
-        
-        <div className="mt-6 text-center">
-          <p className={paragraphClass}>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}
+          
+          <form onSubmit={handleSubmit}>
+            <div className="mb-4">
+              <label htmlFor="username" className={labelClass}>
+                Username or Email
+              </label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                className={inputClass}
+                placeholder="Enter your FullName"
+              />
+            </div>
+            
+            {!isLogin && (
+              <>
+                <div className="mb-4">
+                  <label htmlFor="email" className={labelClass}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Enter your email"
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label htmlFor="phone" className={labelClass}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className={inputClass}
+                    placeholder="Enter your phone number"
+                  />
+                </div>
+              </>
+            )}
+            
+            <div className="mb-6">
+              <label htmlFor="password" className={labelClass}>
+                Password
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className={inputClass}
+                placeholder="Enter your password"
+              />
+            </div>
+            
             <button
-              type="button"
-              onClick={toggleAuthMode}
-              className={`ml-2 ${linkTextClass}`}
+              type="submit"
+              className={buttonClass}
+              disabled={loading}
             >
-              {isLogin ? 'Sign Up' : 'Login'}
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                isLogin ? 'Login' : 'Sign Up'
+              )}
             </button>
-          </p>
+            
+            {isLogin && (
+              <div className="mt-4 text-center">
+                <Link href="/forgot-password" className={linkTextClass}>
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+          </form>
+          
+          <div className="mt-6 text-center">
+            <p className={paragraphClass}>
+              {isLogin ? "Don't have an account?" : "Already have an account?"}
+              <button
+                type="button"
+                onClick={toggleAuthMode}
+                className={`ml-2 ${linkTextClass}`}
+              >
+                {isLogin ? 'Sign Up' : 'Login'}
+              </button>
+            </p>
+          </div>
         </div>
       </div>
     </div>

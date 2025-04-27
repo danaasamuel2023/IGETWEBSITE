@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import logo from '../images/IgetLogo.jpg'
+import logo from '../images/igetLogo - Copy.jpg'
 
 const Navigation = () => {
    const [isMenuOpen, setIsMenuOpen] = useState(false);

@@ -1,18 +1,13 @@
-// pages/register.js
 'use client'
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { Check, Moon, Sun, CreditCard, User, Phone, Calendar, Briefcase, MapPin, AlertCircle } from 'lucide-react';
+import { Check, Moon, Sun, User, Phone, AlertCircle } from 'lucide-react';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     phoneNumber: '',
-    idType: '',
-    idNumber: '',
-    dateOfBirth: '',
-    occupation: '',
-    location: '',
     price: 1
   });
   
@@ -70,13 +65,20 @@ export default function RegisterPage() {
         return;
       }
       
+      // Combine first and last name for the API that expects fullName
+      const apiData = {
+        fullName: `${formData.firstName} ${formData.lastName}`,
+        phoneNumber: formData.phoneNumber,
+        price: formData.price
+      };
+      
       const response = await fetch('http://localhost:5000/api/afa/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(apiData)
       });
       
       const data = await response.json();
@@ -107,13 +109,9 @@ export default function RegisterPage() {
   const resetForm = () => {
     setSuccess(null);
     setFormData({
-      fullName: '',
+      firstName: '',
+      lastName: '',
       phoneNumber: '',
-      idType: '',
-      idNumber: '',
-      dateOfBirth: '',
-      occupation: '',
-      location: '',
       price: 20
     });
   };
@@ -139,7 +137,7 @@ export default function RegisterPage() {
           </header>
 
           {!success ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-lg mx-auto">
               <h2 className="text-2xl font-semibold mb-6">New AFA Registration</h2>
               
               {error && (
@@ -149,178 +147,67 @@ export default function RegisterPage() {
                 </div>
               )}
               
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="fullName" className="block mb-2 font-medium">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="text" 
-                        id="fullName" 
-                        name="fullName" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.fullName}
-                        onChange={handleChange}
-                        required 
-                        placeholder="Enter full name"
-                      />
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label htmlFor="firstName" className="block mb-2 font-medium">
+                    First Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
                     </div>
+                    <input 
+                      type="text" 
+                      id="firstName" 
+                      name="firstName" 
+                      className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      required 
+                      placeholder="Enter first name"
+                    />
                   </div>
-                  
-                  <div>
-                    <label htmlFor="phoneNumber" className="block mb-2 font-medium">
-                      Phone Number
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Phone className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="tel" 
-                        id="phoneNumber" 
-                        name="phoneNumber" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.phoneNumber}
-                        onChange={handleChange}
-                        required 
-                        placeholder="e.g. 0200000000"
-                      />
+                </div>
+                
+                <div>
+                  <label htmlFor="lastName" className="block mb-2 font-medium">
+                    Last Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
                     </div>
+                    <input 
+                      type="text" 
+                      id="lastName" 
+                      name="lastName" 
+                      className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      required 
+                      placeholder="Enter last name"
+                    />
                   </div>
-                  
-                  <div>
-                    <label htmlFor="idType" className="block mb-2 font-medium">
-                      ID Type
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <CreditCard className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <select 
-                        id="idType" 
-                        name="idType" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.idType}
-                        onChange={handleChange}
-                        required
-                      >
-                        <option value="">Select ID Type</option>
-                        <option value="Ghana Card">Ghana Card</option>
-                        <option value="Voter ID">Voter ID</option>
-                        <option value="Passport">Passport</option>
-                        <option value="Driver License">Driver License</option>
-                      </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="phoneNumber" className="block mb-2 font-medium">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone className="h-5 w-5 text-gray-400" />
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="idNumber" className="block mb-2 font-medium">
-                      ID Number
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <CreditCard className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="text" 
-                        id="idNumber" 
-                        name="idNumber" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.idNumber}
-                        onChange={handleChange}
-                        required 
-                        placeholder="Enter ID number"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="dateOfBirth" className="block mb-2 font-medium">
-                      Date of Birth
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="date" 
-                        id="dateOfBirth" 
-                        name="dateOfBirth" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.dateOfBirth}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="occupation" className="block mb-2 font-medium">
-                      Occupation
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Briefcase className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="text" 
-                        id="occupation" 
-                        name="occupation" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.occupation}
-                        onChange={handleChange}
-                        required 
-                        placeholder="Enter occupation"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="location" className="block mb-2 font-medium">
-                      Location
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MapPin className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="text" 
-                        id="location" 
-                        name="location" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.location}
-                        onChange={handleChange}
-                        required 
-                        placeholder="Enter location"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="price" className="block mb-2 font-medium">
-                      Price (GHS)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <CreditCard className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input 
-                        type="number" 
-                        id="price" 
-                        name="price" 
-                        className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
-                        value={formData.price}
-                        onChange={handleChange}
-                        required 
-                        min="1" 
-                        step="0.01"
-                      />
-                    </div>
+                    <input 
+                      type="tel" 
+                      id="phoneNumber" 
+                      name="phoneNumber" 
+                      className="pl-10 w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600" 
+                      value={formData.phoneNumber}
+                      onChange={handleChange}
+                      required 
+                      placeholder="e.g. 0200000000"
+                    />
                   </div>
                 </div>
                 
@@ -344,7 +231,7 @@ export default function RegisterPage() {
               </form>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-lg mx-auto text-center">
               <div className="flex flex-col items-center">
                 <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
@@ -352,17 +239,14 @@ export default function RegisterPage() {
                 <h2 className="text-2xl font-semibold mb-2">Registration Successful!</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">Your AFA registration has been completed successfully.</p>
                 
-                <div className="w-full max-w-md bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <div className="w-full bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                   <h3 className="text-xl font-medium mb-4 text-left">Registration Details</h3>
                   <div className="grid grid-cols-2 gap-y-3">
-                    <div className="text-left text-gray-600 dark:text-gray-400">Full Name:</div>
+                    <div className="text-left text-gray-600 dark:text-gray-400">Name:</div>
                     <div className="text-right font-medium">{success.registration.fullName}</div>
                     
                     <div className="text-left text-gray-600 dark:text-gray-400">Phone Number:</div>
                     <div className="text-right font-medium">{success.order.recipientNumber}</div>
-                    
-                    <div className="text-left text-gray-600 dark:text-gray-400">Capacity:</div>
-                    <div className="text-right font-medium">{success.registration.capacity}</div>
                     
                     <div className="text-left text-gray-600 dark:text-gray-400">Amount Paid:</div>
                     <div className="text-right font-medium">GHS {success.order.price.toFixed(2)}</div>

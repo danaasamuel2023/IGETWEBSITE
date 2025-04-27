@@ -1,11 +1,9 @@
-// pages/admin/afa-registrations.js
 'use client'
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/adminWraper';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { Search, Download, Filter, ChevronDown, ChevronUp, User, Calendar, MapPin, CreditCard, Phone, FileText, RefreshCw } from 'lucide-react';
-import Link from 'next/link';
+import { Search, Download, Filter, ChevronDown, ChevronUp, User, Calendar, Phone, CreditCard, RefreshCw } from 'lucide-react';
 
 export default function AFARegistrationsPage() {
   const [registrations, setRegistrations] = useState([]);
@@ -15,6 +13,8 @@ export default function AFARegistrationsPage() {
   const [sortField, setSortField] = useState('createdAt');
   const [sortDirection, setSortDirection] = useState('desc');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedRegistrations, setSelectedRegistrations] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState('');
   
   // Fetch AFA registrations
   useEffect(() => {
@@ -74,9 +74,7 @@ export default function AFARegistrationsPage() {
         return (
           reg.orderReference.toLowerCase().includes(searchLower) ||
           reg.phoneNumber.toLowerCase().includes(searchLower) ||
-          (reg.metadata?.fullName && reg.metadata.fullName.toLowerCase().includes(searchLower)) ||
-          (reg.metadata?.idNumber && reg.metadata.idNumber.toLowerCase().includes(searchLower)) ||
-          (reg.metadata?.location && reg.metadata.location.toLowerCase().includes(searchLower))
+          (reg.metadata?.fullName && reg.metadata.fullName.toLowerCase().includes(searchLower))
         );
       }
       
@@ -94,12 +92,6 @@ export default function AFARegistrationsPage() {
         return sortDirection === 'asc'
           ? a.price - b.price
           : b.price - a.price;
-      }
-      
-      if (sortField === 'capacity') {
-        return sortDirection === 'asc'
-          ? a.capacity - b.capacity
-          : b.capacity - a.capacity;
       }
       
       if (sortField === 'fullName') {
@@ -122,6 +114,95 @@ export default function AFARegistrationsPage() {
     }
   };
   
+  // Update registration status
+  const handleStatusChange = async (registrationId, newStatus) => {
+    try {
+      setLoading(true);
+      
+      const response = await axios.put(`http://localhost:5000/api/afa/registrations/${registrationId}/status`, {
+        status: newStatus
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+        }
+      });
+      
+      if (response.data.success) {
+        // Update the registration in the state
+        const updatedRegistrations = registrations.map(reg => 
+          reg._id === registrationId ? { ...reg, status: newStatus } : reg
+        );
+        setRegistrations(updatedRegistrations);
+      } else {
+        setError('Failed to update registration status');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update registration status');
+      console.error('Error updating registration status:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle bulk status update
+  const handleBulkStatusChange = async () => {
+    if (!bulkStatus || selectedRegistrations.length === 0) {
+      setError('Please select at least one registration and a status to update');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const updatePromises = selectedRegistrations.map(regId => 
+        axios.put(`http://localhost:5000/api/afa/registrations/${regId}/status`, {
+          status: bulkStatus
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          }
+        })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update registrations in the state
+      const updatedRegistrations = registrations.map(reg => 
+        selectedRegistrations.includes(reg._id) ? { ...reg, status: bulkStatus } : reg
+      );
+      setRegistrations(updatedRegistrations);
+      
+      // Clear selected registrations
+      setSelectedRegistrations([]);
+      setBulkStatus('');
+    } catch (err) {
+      setError('Failed to update multiple registrations');
+      console.error('Error updating multiple registrations:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Toggle registration selection
+  const handleRegistrationSelect = (regId) => {
+    setSelectedRegistrations(prev => {
+      if (prev.includes(regId)) {
+        return prev.filter(id => id !== regId);
+      } else {
+        return [...prev, regId];
+      }
+    });
+  };
+  
+  // Select or deselect all registrations
+  const handleSelectAll = () => {
+    if (selectedRegistrations.length === filteredAndSortedRegistrations.length) {
+      setSelectedRegistrations([]);
+    } else {
+      setSelectedRegistrations(filteredAndSortedRegistrations.map(reg => reg._id));
+    }
+  };
+  
   // Export to CSV
   const exportToCSV = () => {
     // Headers for CSV
@@ -129,12 +210,6 @@ export default function AFARegistrationsPage() {
       'Reference',
       'Full Name',
       'Phone Number',
-      'ID Type',
-      'ID Number',
-      'Date of Birth',
-      'Occupation',
-      'Location',
-      'Capacity',
       'Price',
       'Status',
       'Date'
@@ -142,20 +217,10 @@ export default function AFARegistrationsPage() {
     
     // Map registrations to CSV rows
     const csvRows = filteredAndSortedRegistrations.map(reg => {
-      const dob = reg.metadata?.dateOfBirth 
-        ? format(new Date(reg.metadata.dateOfBirth), 'yyyy-MM-dd')
-        : 'N/A';
-        
       return [
         reg.orderReference,
         reg.metadata?.fullName || 'N/A',
         reg.phoneNumber,
-        reg.metadata?.idType || 'N/A',
-        reg.metadata?.idNumber || 'N/A',
-        dob,
-        reg.metadata?.occupation || 'N/A',
-        reg.metadata?.location || 'N/A',
-        reg.capacity,
         reg.price,
         reg.status,
         format(new Date(reg.createdAt), 'yyyy-MM-dd HH:mm:ss')
@@ -187,6 +252,10 @@ export default function AFARegistrationsPage() {
       bgColor = 'bg-yellow-100 text-yellow-800';
     } else if (status === 'failed') {
       bgColor = 'bg-red-100 text-red-800';
+    } else if (status === 'processing') {
+      bgColor = 'bg-blue-100 text-blue-800';
+    } else if (status === 'refunded') {
+      bgColor = 'bg-purple-100 text-purple-800';
     }
     
     return (
@@ -205,6 +274,33 @@ export default function AFARegistrationsPage() {
           </h1>
           
           <div className="flex flex-wrap gap-2">
+            {selectedRegistrations.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  {selectedRegistrations.length} selected
+                </span>
+                <select
+                  className="text-sm border border-gray-300 rounded-md p-2"
+                  value={bulkStatus}
+                  onChange={(e) => setBulkStatus(e.target.value)}
+                >
+                  <option value="">Update Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="completed">Completed</option>
+                  <option value="failed">Failed</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+                <button
+                  onClick={handleBulkStatusChange}
+                  disabled={!bulkStatus}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+            
             <button
               onClick={() => window.location.reload()}
               className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -233,7 +329,7 @@ export default function AFARegistrationsPage() {
               <input
                 type="text"
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Search by name, phone, ID, location..."
+                placeholder="Search by name or phone number"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -249,9 +345,11 @@ export default function AFARegistrationsPage() {
                 onChange={(e) => setFilterStatus(e.target.value)}
               >
                 <option value="all">All Statuses</option>
-                <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
                 <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
               </select>
             </div>
           </div>
@@ -293,6 +391,16 @@ export default function AFARegistrationsPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                            onChange={handleSelectAll}
+                            checked={filteredAndSortedRegistrations.length > 0 && selectedRegistrations.length === filteredAndSortedRegistrations.length}
+                          />
+                        </div>
+                      </th>
                       <th 
                         scope="col" 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -300,7 +408,7 @@ export default function AFARegistrationsPage() {
                       >
                         <div className="flex items-center">
                           <User className="h-4 w-4 mr-1" />
-                          Customer Details
+                          Customer Name
                           {sortField === 'fullName' && (
                             sortDirection === 'asc' ? 
                             <ChevronUp className="h-4 w-4 ml-1" /> : 
@@ -311,17 +419,11 @@ export default function AFARegistrationsPage() {
                       
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                        onClick={() => handleSort('capacity')}
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                       >
                         <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-1" />
-                          Registration Details
-                          {sortField === 'capacity' && (
-                            sortDirection === 'asc' ? 
-                            <ChevronUp className="h-4 w-4 ml-1" /> : 
-                            <ChevronDown className="h-4 w-4 ml-1" />
-                          )}
+                          <Phone className="h-4 w-4 mr-1" />
+                          Phone Number
                         </div>
                       </th>
                       
@@ -343,6 +445,15 @@ export default function AFARegistrationsPage() {
                       
                       <th 
                         scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        <div className="flex items-center">
+                          Status
+                        </div>
+                      </th>
+                      
+                      <th 
+                        scope="col" 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                         onClick={() => handleSort('createdAt')}
                       >
@@ -356,13 +467,20 @@ export default function AFARegistrationsPage() {
                           )}
                         </div>
                       </th>
+                      
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredAndSortedRegistrations.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="px-6 py-10 text-center text-sm text-gray-500">
+                        <td colSpan="7" className="px-6 py-10 text-center text-sm text-gray-500">
                           No registrations found
                           {searchTerm && ' matching your search'}
                           {filterStatus !== 'all' && ` with status: ${filterStatus}`}
@@ -370,33 +488,24 @@ export default function AFARegistrationsPage() {
                       </tr>
                     ) : (
                       filteredAndSortedRegistrations.map((reg) => (
-                        <tr key={reg.id} className="hover:bg-gray-50">
+                        <tr key={reg._id} className={selectedRegistrations.includes(reg._id) ? "bg-indigo-50" : ""}>
+                          <td className="px-3 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                              onChange={() => handleRegistrationSelect(reg._id)}
+                              checked={selectedRegistrations.includes(reg._id)}
+                            />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {reg.metadata?.fullName || 'N/A'}
                             </div>
-                            <div className="flex items-center text-sm text-gray-500 mt-1">
-                              <Phone className="h-4 w-4 mr-1" />
-                              {reg.phoneNumber}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500 mt-1">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              {reg.metadata?.location || 'N/A'}
-                            </div>
                           </td>
                           
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              <span className="font-medium">Order Ref:</span> {reg.orderReference}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              <span className="font-medium">ID:</span> {reg.metadata?.idType || 'N/A'} - {reg.metadata?.idNumber || 'N/A'}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              <span className="font-medium">Capacity:</span> {reg.capacity}
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              <span className="font-medium">Status:</span> <StatusBadge status={reg.status} />
+                            <div className="text-sm text-gray-500">
+                              {reg.phoneNumber}
                             </div>
                           </td>
                           
@@ -404,13 +513,32 @@ export default function AFARegistrationsPage() {
                             <div className="text-sm font-medium text-gray-900">
                               GHS {reg.price.toFixed(2)}
                             </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Paid from wallet
+                            <div className="text-xs text-gray-500 mt-1">
+                              Ref: {reg.orderReference}
                             </div>
+                          </td>
+                          
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge status={reg.status} />
                           </td>
                           
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(reg.createdAt)}
+                          </td>
+                          
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <select 
+                              className="text-sm border border-gray-300 rounded py-1 px-2 bg-white"
+                              value={reg.status || ''}
+                              onChange={(e) => handleStatusChange(reg._id, e.target.value)}
+                            >
+                              <option value="" disabled>Change Status</option>
+                              <option value="pending">Pending</option>
+                              <option value="processing">Processing</option>
+                              <option value="completed">Completed</option>
+                              <option value="failed">Failed</option>
+                              <option value="refunded">Refunded</option>
+                            </select>
                           </td>
                         </tr>
                       ))
