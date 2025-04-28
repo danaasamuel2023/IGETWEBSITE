@@ -266,25 +266,20 @@ const DashboardPage = () => {
             <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <button 
-                onClick={() => router.push('/new-order')}
+                onClick={() => router.push('/mtn')}
                 className="rounded-lg p-4 flex flex-col items-center bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
                 <Package className="h-6 w-6 mb-2" />
                 <span className="text-sm font-medium">New Order</span>
               </button>
               <button 
-                onClick={() => router.push('/reports')}
+                onClick={() => router.push('/orders')}
                 className="rounded-lg p-4 flex flex-col items-center bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
                 <Clock className="h-6 w-6 mb-2" />
                 <span className="text-sm font-medium">Order History</span>
               </button>
+              
               <button 
-                onClick={() => router.push('/manage-bundles')}
-                className="rounded-lg p-4 flex flex-col items-center bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
-                <Database className="h-6 w-6 mb-2" />
-                <span className="text-sm font-medium">Manage Bundles</span>
-              </button>
-              <button 
-                onClick={() => router.push('/add-funds')}
+                onClick={() => router.push('/deposite')}
                 className="rounded-lg p-4 flex flex-col items-center bg-blue-50 text-blue-500 hover:bg-blue-100 transition-colors">
                 <CreditCard className="h-6 w-6 mb-2" />
                 <span className="text-sm font-medium">Add Funds</span>

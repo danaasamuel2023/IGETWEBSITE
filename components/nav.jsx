@@ -147,14 +147,19 @@ const Navigation = () => {
            <Link 
              href="/" 
              onClick={handleLinkClick}
+             className="flex items-center"
            >
-             <Image
-               src={logo}
-               alt="iGet Logo"
-               width={100}
-               height={90}
-               className="mr-5"
-             />
+             <div className="relative h-10 w-10 overflow-hidden rounded-md">
+               <Image
+                 src={logo}
+                 alt="iGet Logo"
+                 layout="fill"
+                 objectFit="cover"
+                 className="rounded-md"
+                 priority
+               />
+             </div>
+             <span className="ml-2 font-bold text-lg">iGet</span>
            </Link>
          </div>
 
@@ -338,6 +343,20 @@ const Navigation = () => {
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                  </svg>
                </button>
+
+               {/* Mobile Logo */}
+               <div className="flex items-center mb-8 pt-2">
+                 <div className="relative h-10 w-10 overflow-hidden rounded-md">
+                   <Image
+                     src={logo}
+                     alt="iGet Logo"
+                     layout="fill"
+                     objectFit="cover"
+                     className="rounded-md"
+                   />
+                 </div>
+                 <span className="ml-2 font-bold text-lg text-white">iGet</span>
+               </div>
 
                {/* Mobile Menu Content */}
                <div className="space-y-4 mt-12">

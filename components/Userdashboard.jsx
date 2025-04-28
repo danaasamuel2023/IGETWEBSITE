@@ -1,7 +1,7 @@
 // pages/dashboard/today.js
 'use client'
 import { useState, useEffect } from 'react';
-import { ArrowUp, ArrowDown, ShoppingBag, Wallet, RefreshCw } from 'lucide-react';
+import { ArrowUp, ArrowDown, ShoppingBag, Wallet, RefreshCw, Plus, History, ShoppingCart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function TodayStats() {
@@ -77,6 +77,29 @@ export default function TodayStats() {
       currency: 'USD'
     }).format(amount);
   };
+  
+  const handleDepositClick = () => {
+    router.push('/dashboard/deposit');
+  };
+  
+  const handleOrderHistoryClick = () => {
+    router.push('/dashboard/orders');
+  };
+  
+  const [showNetworkOptions, setShowNetworkOptions] = useState(false);
+  
+  const handleNewOrderClick = () => {
+    setShowNetworkOptions(true);
+  };
+  
+  const handleNetworkSelect = (network) => {
+    setShowNetworkOptions(false);
+    if (network === 'mtn') {
+      router.push('/dashboard/mtn');
+    } else if (network === 'telecel') {
+      router.push('/dashboard/telecel');
+    }
+  };
 
   if (loading) {
     return (
@@ -98,7 +121,60 @@ export default function TodayStats() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-6">Today's Activity</h1>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold mb-4 md:mb-0">Today's Activity</h1>
+        <div className="flex flex-wrap gap-3 justify-center md:justify-end w-full md:w-auto">
+          <button 
+            onClick={handleDepositClick}
+            className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg shadow-md hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-all duration-300"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Top Up Wallet
+          </button>
+          <button 
+            onClick={handleOrderHistoryClick}
+            className="flex items-center px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white font-medium rounded-lg shadow-md hover:from-green-600 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition-all duration-300"
+          >
+            <History className="h-4 w-4 mr-2" />
+            Order History
+          </button>
+          <button 
+            onClick={handleNewOrderClick}
+            className="flex items-center px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-medium rounded-lg shadow-md hover:from-purple-600 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75 transition-all duration-300"
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            New Order
+          </button>
+        </div>
+      </div>
+      
+      {showNetworkOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Select Network</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handleNetworkSelect('mtn')}
+                className="py-3 px-4 bg-yellow-400 text-yellow-900 font-semibold rounded-lg hover:bg-yellow-500 transition-all duration-300"
+              >
+                MTN
+              </button>
+              <button
+                onClick={() => handleNetworkSelect('telecel')}
+                className="py-3 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-all duration-300"
+              >
+                Telecel
+              </button>
+            </div>
+            <button
+              onClick={() => setShowNetworkOptions(false)}
+              className="mt-4 w-full py-2 bg-gray-200 text-gray-800 font-medium rounded-lg hover:bg-gray-300 transition-all duration-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Orders Today Card */}
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
