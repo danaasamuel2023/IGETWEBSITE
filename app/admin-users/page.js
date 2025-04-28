@@ -217,12 +217,12 @@ export default function UsersManagement() {
       
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-          <h1 className="text-2xl font-bold mb-4 sm:mb-0">User Management</h1>
+          <h1 className="text-2xl font-bold mb-4 sm:mb-0 dark:text-white">User Management</h1>
           <div className="relative w-full sm:w-64">
             <input
               type="text"
               placeholder="Search users..."
-              className="w-full px-4 py-2 border rounded-lg"
+              className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -236,82 +236,82 @@ export default function UsersManagement() {
         </div>
 
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 dark:bg-red-900 dark:border-red-600 dark:text-red-200" role="alert">
             <p>{error}</p>
           </div>
         )}
 
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-white rounded-lg shadow">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto bg-white rounded-lg shadow dark:bg-gray-800 dark:shadow-md">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wallet</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">User</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Role</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Status</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Wallet</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
                 {filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => (
-                    <tr key={user._id}>
+                    <tr key={user._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                            <div className="text-sm text-gray-500">{user.email}</div>
-                            <div className="text-sm text-gray-500">{user.phone}</div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-300">{user.email}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-300">{user.phone}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
-                            user.role === 'agent' ? 'bg-green-100 text-green-800' : 
-                            'bg-blue-100 text-blue-800'}`}>
+                          ${user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 
+                            user.role === 'agent' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
+                            'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}`}>
                           {user.role || 'user'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          ${user.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
                           {user.isActive ? 'Active' : 'Disabled'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         {(user.wallet?.balance || 0).toFixed(2)} {user.wallet?.currency || 'USD'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex flex-col sm:flex-row gap-2">
                           <button 
                             onClick={() => handleOpenModal('deposit', user)}
-                            className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-2 py-1 rounded">
+                            className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-2 py-1 rounded dark:bg-indigo-900 dark:text-indigo-200 dark:hover:bg-indigo-800">
                             Add Funds
                           </button>
                           <button 
                             onClick={() => handleOpenModal('changeRole', user)}
-                            className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded">
+                            className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800">
                             Change Role
                           </button>
                           <button 
                             onClick={() => handleOpenModal('toggleStatus', user)}
-                            className={`${user.isActive ? 'text-orange-600 hover:text-orange-900 bg-orange-50' : 'text-green-600 hover:text-green-900 bg-green-50'} px-2 py-1 rounded`}>
+                            className={`${user.isActive ? 'text-orange-600 hover:text-orange-900 bg-orange-50 dark:bg-orange-900 dark:text-orange-200 dark:hover:bg-orange-800' : 'text-green-600 hover:text-green-900 bg-green-50 dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800'} px-2 py-1 rounded`}>
                             {user.isActive ? 'Disable' : 'Enable'}
                           </button>
                           <button 
                             onClick={() => handleOpenModal('deleteApiKey', user)}
-                            className="text-yellow-600 hover:text-yellow-900 bg-yellow-50 px-2 py-1 rounded">
+                            className="text-yellow-600 hover:text-yellow-900 bg-yellow-50 px-2 py-1 rounded dark:bg-yellow-800 dark:text-yellow-200 dark:hover:bg-yellow-700">
                             Delete API Key
                           </button>
                           <button 
                             onClick={() => handleOpenModal('deleteUser', user)}
-                            className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded">
+                            className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800">
                             Delete
                           </button>
                         </div>
@@ -320,7 +320,7 @@ export default function UsersManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                       No users found
                     </td>
                   </tr>
@@ -335,20 +335,20 @@ export default function UsersManagement() {
       {showModal && selectedUser && (
         <>
           {/* Modal backdrop - higher z-index than sidebar */}
-          <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+          <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-gray-900 dark:bg-opacity-75"></div>
           
           {/* Modal dialog - even higher z-index */}
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
-              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full dark:bg-gray-800">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 dark:bg-gray-800">
                   <div className="sm:flex sm:items-start">
                     {modalType === 'deleteUser' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Delete User</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Delete User</h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 dark:text-gray-300">
                             Are you sure you want to delete the user "{selectedUser.username}"? This action cannot be undone.
                           </p>
                         </div>
@@ -357,11 +357,11 @@ export default function UsersManagement() {
 
                     {modalType === 'toggleStatus' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                           {selectedUser.isActive ? 'Disable' : 'Enable'} User
                         </h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 dark:text-gray-300">
                             Are you sure you want to {selectedUser.isActive ? 'disable' : 'enable'} the user "{selectedUser.username}"?
                           </p>
                         </div>
@@ -370,9 +370,9 @@ export default function UsersManagement() {
 
                     {modalType === 'deleteApiKey' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Delete API Key</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Delete API Key</h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-gray-500 dark:text-gray-300">
                             Are you sure you want to delete the API key for user "{selectedUser.username}"? This will revoke API access.
                           </p>
                         </div>
@@ -381,19 +381,19 @@ export default function UsersManagement() {
 
                     {modalType === 'deposit' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Add Funds to Wallet</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Add Funds to Wallet</h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500 mb-4">
+                          <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
                             Add funds to {selectedUser.username}'s wallet.
                           </p>
                           <form onSubmit={handleDeposit}>
                             <div className="mb-4">
-                              <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount ({selectedUser.wallet?.currency || 'USD'})</label>
+                              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount ({selectedUser.wallet?.currency || 'USD'})</label>
                               <input
                                 type="number"
                                 step="0.01"
                                 id="amount"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                 placeholder="0.00"
                                 value={depositAmount}
                                 onChange={(e) => setDepositAmount(e.target.value)}
@@ -401,11 +401,11 @@ export default function UsersManagement() {
                               />
                             </div>
                             <div className="mb-4">
-                              <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description (Optional)</label>
+                              <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (Optional)</label>
                               <input
                                 type="text"
                                 id="description"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                 placeholder="Funds added by admin"
                                 value={depositDescription}
                                 onChange={(e) => setDepositDescription(e.target.value)}
@@ -418,17 +418,17 @@ export default function UsersManagement() {
 
                     {modalType === 'changeRole' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Change User Role</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Change User Role</h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500 mb-4">
+                          <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
                             Change role for user "{selectedUser.username}".
                           </p>
                           <form onSubmit={handleChangeRole}>
                             <div className="mb-4">
-                              <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+                              <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
                               <select
                                 id="role"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                 value={newRole}
                                 onChange={(e) => setNewRole(e.target.value)}
                               >
@@ -443,7 +443,7 @@ export default function UsersManagement() {
                     )}
                   </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse dark:bg-gray-700">
                   {modalType === 'deleteUser' && (
                     <>
                       <button
@@ -455,7 +455,7 @@ export default function UsersManagement() {
                       </button>
                       <button
                         type="button"
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={handleCloseModal}
                       >
                         Cancel
@@ -474,7 +474,7 @@ export default function UsersManagement() {
                       </button>
                       <button
                         type="button"
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={handleCloseModal}
                       >
                         Cancel
@@ -493,7 +493,7 @@ export default function UsersManagement() {
                       </button>
                       <button
                         type="button"
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={handleCloseModal}
                       >
                         Cancel
@@ -512,7 +512,7 @@ export default function UsersManagement() {
                       </button>
                       <button
                         type="button"
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={handleCloseModal}
                       >
                         Cancel
@@ -531,7 +531,7 @@ export default function UsersManagement() {
                       </button>
                       <button
                         type="button"
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
                         onClick={handleCloseModal}
                       >
                         Cancel
