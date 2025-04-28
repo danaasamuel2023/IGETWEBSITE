@@ -72,7 +72,7 @@ export default function RegisterPage() {
         price: formData.price
       };
       
-      const response = await fetch('http://localhost:5000/api/afa/register', {
+      const response = await fetch('https://iget.onrender.com/api/afa/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
