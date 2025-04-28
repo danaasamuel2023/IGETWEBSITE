@@ -271,7 +271,7 @@ const BundleFilter = () => {
                   type="tel"
                   value={recipientNumber}
                   onChange={(e) => setRecipientNumber(e.target.value)}
-                  placeholder="e.g. +233123456789"
+                  placeholder="MTN beneficiary number"
                   className="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 dark:text-white dark:bg-gray-600 dark:border-gray-500 leading-tight focus:outline-none focus:ring-2 focus:ring-yellow-500"
                 />
               </div>

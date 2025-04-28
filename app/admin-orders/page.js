@@ -4,7 +4,7 @@ import axios from 'axios';
 import Head from 'next/head';
 import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
-import { Phone, User } from 'lucide-react'; // Import Lucide icons
+import { Phone, User, Search } from 'lucide-react'; // Added Search icon
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
@@ -19,19 +19,21 @@ export default function OrdersManagement() {
     startDate: '',
     endDate: ''
   });
+  // Add search state
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
 
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  // Apply client-side filtering when filter state changes
+  // Apply client-side filtering when filter state changes or search query changes
   useEffect(() => {
     applyFilters();
-  }, [filter, orders, currentPage]);
+  }, [filter, orders, currentPage, searchQuery]); // Added searchQuery dependency
   
   const fetchOrders = async () => {
     try {
@@ -67,6 +69,26 @@ export default function OrdersManagement() {
     // Filter orders based on current filters
     let result = [...orders];
     
+    // Apply search filter first
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(order => 
+        // Search by order ID or reference
+        (order._id && order._id.toLowerCase().includes(query)) ||
+        (order.orderReference && order.orderReference.toLowerCase().includes(query)) ||
+        // Search by user information
+        (order.user?.username && order.user.username.toLowerCase().includes(query)) ||
+        (order.user?.email && order.user.email.toLowerCase().includes(query)) ||
+        (order.user?.phone && order.user.phone.toLowerCase().includes(query)) ||
+        // Search by recipient number
+        (order.recipientNumber && order.recipientNumber.toLowerCase().includes(query)) ||
+        // Search by AfA registration metadata
+        (order.metadata?.fullName && order.metadata.fullName.toLowerCase().includes(query)) ||
+        (order.phoneNumber && order.phoneNumber.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply other filters
     if (filter.status) {
       result = result.filter(order => order.status === filter.status);
     }
@@ -102,6 +124,18 @@ export default function OrdersManagement() {
     const paginatedResult = result.slice(startIndex, startIndex + itemsPerPage);
     
     setFilteredOrders(paginatedResult);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page when search changes
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setCurrentPage(1);
   };
 
   // Direct status update function (no modal)
@@ -211,6 +245,7 @@ export default function OrdersManagement() {
       startDate: '',
       endDate: ''
     });
+    setSearchQuery(''); // Also clear search query on reset
     setCurrentPage(1);
   };
 
@@ -312,6 +347,34 @@ export default function OrdersManagement() {
           </div>
         </div>
 
+        {/* Search Bar - New Addition */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search by ID, username, email, phone or recipient number..."
+              className="pl-10 pr-10 py-2 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+            {searchQuery && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button 
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Filter Form */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
           <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -387,11 +450,18 @@ export default function OrdersManagement() {
                 onClick={resetFilters}
                 className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Reset
+                Reset All Filters
               </button>
             </div>
           </form>
         </div>
+
+        {/* Search Results Stats - New Addition */}
+        {searchQuery && (
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            Found {filteredOrders.length} of {orders.length} orders matching "{searchQuery}"
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-100 p-4 mb-4" role="alert">
@@ -524,7 +594,7 @@ export default function OrdersManagement() {
                   ) : (
                     <tr>
                       <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No orders found
+                        {searchQuery ? "No orders found matching your search" : "No orders found"}
                       </td>
                     </tr>
                   )}
@@ -614,4 +684,5 @@ export default function OrdersManagement() {
       </div>
 
     </AdminLayout>
-  )};
+  )
+};

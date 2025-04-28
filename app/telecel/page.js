@@ -243,7 +243,7 @@ const TelecelBundleCards = () => {
               </div>
               <div className="flex justify-between mb-3">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Validity:</span>
-                <span className="text-black dark:text-white font-medium">{selectedBundle.validity || "30 Days"}</span>
+                <span className="text-black dark:text-white font-medium">{selectedBundle.validity || "60 Days"}</span>
               </div>
             </div>
             
@@ -256,7 +256,7 @@ const TelecelBundleCards = () => {
                   type="tel"
                   value={recipientNumber}
                   onChange={(e) => setRecipientNumber(e.target.value)}
-                  placeholder="e.g. 0271234567"
+                  placeholder="e.g."
                   className="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 dark:text-white dark:bg-gray-600 dark:border-gray-500 leading-tight focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
