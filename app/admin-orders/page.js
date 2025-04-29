@@ -273,29 +273,48 @@ export default function OrdersManagement() {
 
   const exportToExcel = async () => {
     try {
-      // Use the already loaded orders, no need to fetch again
-      const excelData = orders.map(order => ({
-        'Order ID': order._id,
-        'Reference': order.orderReference || 'N/A',
-        'Username': order.user?.username || 'N/A',
-        'Email': order.user?.email || 'N/A',
-        'Phone': order.user?.phone || 'N/A',
-        'Bundle Type': order.bundleType || 'N/A',
-        'Capacity': order.capacity ? (order.capacity/1000) : 0,
-        'Recipient Number': order.recipientNumber || 'N/A',
-        'Price': order.price || 0,
-        'Status': order.status || 'N/A',
-        'Created Date': formatDate(order.createdAt),
-        'Updated Date': formatDate(order.updatedAt)
+      // Determine which orders to export - selected orders if any are selected, otherwise filtered orders
+      const ordersToExport = selectedOrders.length > 0 
+        ? orders.filter(order => selectedOrders.includes(order._id))
+        : filteredOrders;
+      
+      // Create a simpler Excel structure focusing on number and capacity
+      const excelData = ordersToExport.map(order => ({
+        // 'Order ID': order._id,
+        // 'Reference': order.orderReference || 'N/A',
+        'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
+        'Capacity (GB)': order.capacity ? (order.capacity/1000).toFixed(1) : 0,
+        // 'Bundle Type': order.bundleType || 'N/A',
+        // 'Price': order.price ? `₵${order.price.toFixed(2)}` : '₵0.00',
+        // 'Status': order.status || 'N/A',
+        // 'Date': formatDate(order.createdAt)
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
       
-      XLSX.writeFile(workbook, "Orders_Export.xlsx");
+      // Auto-size columns
+      const maxWidth = excelData.reduce((w, r) => Math.max(w, r['Recipient Number'].length), 10);
+      const wscols = [
+        { wch: 24 },  // Order ID
+        { wch: 10 },  // Reference
+        { wch: maxWidth }, // Recipient Number 
+        { wch: 12 },  // Capacity
+        { wch: 15 },  // Bundle Type
+        { wch: 10 },  // Price
+        { wch: 10 },  // Status
+        { wch: 20 }   // Date
+      ];
+      worksheet['!cols'] = wscols;
+      
+      const filename = selectedOrders.length > 0 
+        ? `Selected_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx` 
+        : `Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
+      
+      XLSX.writeFile(workbook, filename);
     } catch (err) {
-      setError('Failed to export orders');
+      setError('Failed to export orders to Excel');
       console.error('Error exporting orders:', err);
     }
   };
@@ -336,14 +355,16 @@ export default function OrdersManagement() {
   </div>
 ) : null}
             <button
-              onClick={exportToExcel}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Export to Excel
-            </button>
+  onClick={exportToExcel}
+  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+>
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+  {selectedOrders.length > 0 
+    ? `Export Selected (${selectedOrders.length})` 
+    : 'Export to Excel'}
+</button>
           </div>
         </div>
 
@@ -559,7 +580,7 @@ export default function OrdersManagement() {
                               {order.recipientNumber || 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.capacity ? (order.capacity) : 'N/A'} 
+                              {order.capacity ? (order.capacity/1000) : 'N/A'} 
                             </td>
                           </>
                         )}
