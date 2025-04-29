@@ -4,11 +4,12 @@ import axios from 'axios';
 import Head from 'next/head';
 import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
-import { Phone, User, Search } from 'lucide-react'; // Added Search icon
+import { Phone, User, Search } from 'lucide-react';
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
+  const [displayedOrders, setDisplayedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -19,7 +20,6 @@ export default function OrdersManagement() {
     startDate: '',
     endDate: ''
   });
-  // Add search state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
@@ -30,10 +30,17 @@ export default function OrdersManagement() {
     fetchOrders();
   }, []);
 
-  // Apply client-side filtering when filter state changes or search query changes
+  // First, apply filters to get filtered orders list
   useEffect(() => {
-    applyFilters();
-  }, [filter, orders, currentPage, searchQuery]); // Added searchQuery dependency
+    if (orders.length > 0) {
+      applyFilters();
+    }
+  }, [filter, orders, searchQuery]);
+
+  // Then, update the displayed orders based on pagination
+  useEffect(() => {
+    updateDisplayedOrders();
+  }, [filteredOrders, currentPage, itemsPerPage]);
   
   const fetchOrders = async () => {
     try {
@@ -48,11 +55,16 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
-        setOrders(response.data.data || []);
+        // Store all orders
+        const allOrders = response.data.data || [];
+        setOrders(allOrders);
+        
         // Initial filtering will be applied by the useEffect
+        console.log(`Fetched ${allOrders.length} total orders`);
       } else {
         setOrders([]);
         setFilteredOrders([]);
+        setDisplayedOrders([]);
         setError('Failed to fetch orders data');
       }
     } catch (err) {
@@ -60,13 +72,14 @@ export default function OrdersManagement() {
       console.error('Error fetching orders:', err);
       setOrders([]);
       setFilteredOrders([]);
+      setDisplayedOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
-    // Filter orders based on current filters
+    // Start with all orders
     let result = [...orders];
     
     // Apply search filter first
@@ -88,15 +101,17 @@ export default function OrdersManagement() {
       );
     }
     
-    // Apply other filters
+    // Apply status filter
     if (filter.status) {
       result = result.filter(order => order.status === filter.status);
     }
     
+    // Apply bundle type filter
     if (filter.bundleType) {
       result = result.filter(order => order.bundleType === filter.bundleType);
     }
     
+    // Apply date range filters
     if (filter.startDate) {
       const startDate = new Date(filter.startDate);
       startDate.setHours(0, 0, 0, 0);
@@ -115,30 +130,34 @@ export default function OrdersManagement() {
       });
     }
     
-    // Calculate total pages
+    // Update filtered orders and calculate total pages
+    setFilteredOrders(result);
     const total = Math.ceil(result.length / itemsPerPage);
     setTotalPages(total > 0 ? total : 1);
     
-    // Apply pagination
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedResult = result.slice(startIndex, startIndex + itemsPerPage);
+    // Reset to first page when filters change
+    setCurrentPage(1);
     
-    setFilteredOrders(paginatedResult);
+    console.log(`Applied filters: ${result.length} orders match the criteria`);
   };
 
-  // Handle search input change
+  const updateDisplayedOrders = () => {
+    // Apply pagination to filtered orders
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedResult = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
+    setDisplayedOrders(paginatedResult);
+    
+    console.log(`Page ${currentPage}: Showing ${paginatedResult.length} orders (${startIndex + 1}-${startIndex + paginatedResult.length} of ${filteredOrders.length})`);
+  };
+
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); // Reset to first page when search changes
   };
 
-  // Clear search
   const clearSearch = () => {
     setSearchQuery('');
-    setCurrentPage(1);
   };
 
-  // Direct status update function (no modal)
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setLoading(true);
@@ -153,11 +172,22 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
-        // Update the order in the orders array
+        // Update the order in all orders array
         const updatedOrders = orders.map(order => 
           order._id === orderId ? { ...order, status: newStatus } : order
         );
         setOrders(updatedOrders);
+        
+        // Re-apply filters to update filtered and displayed orders
+        const updatedFiltered = filteredOrders.map(order => 
+          order._id === orderId ? { ...order, status: newStatus } : order
+        );
+        setFilteredOrders(updatedFiltered);
+        
+        const updatedDisplayed = displayedOrders.map(order => 
+          order._id === orderId ? { ...order, status: newStatus } : order
+        );
+        setDisplayedOrders(updatedDisplayed);
       } else {
         setError('Failed to update order status');
       }
@@ -191,11 +221,21 @@ export default function OrdersManagement() {
       
       await Promise.all(updatePromises);
       
-      // Update orders in the state
+      // Update orders in all states
       const updatedOrders = orders.map(order => 
         selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
       );
       setOrders(updatedOrders);
+      
+      const updatedFiltered = filteredOrders.map(order => 
+        selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
+      );
+      setFilteredOrders(updatedFiltered);
+      
+      const updatedDisplayed = displayedOrders.map(order => 
+        selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
+      );
+      setDisplayedOrders(updatedDisplayed);
       
       // Clear selected orders
       setSelectedOrders([]);
@@ -219,6 +259,14 @@ export default function OrdersManagement() {
   };
 
   const handleSelectAll = () => {
+    if (selectedOrders.length === displayedOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(displayedOrders.map(order => order._id));
+    }
+  };
+
+  const handleSelectAllFiltered = () => {
     if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
@@ -229,13 +277,12 @@ export default function OrdersManagement() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilter(prev => ({ ...prev, [name]: value }));
-    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    // No need to do anything special here since filtering is now client-side
-    // and handled by useEffect when filter state changes
+    // Manually trigger filter application
+    applyFilters();
   };
 
   const resetFilters = () => {
@@ -245,8 +292,7 @@ export default function OrdersManagement() {
       startDate: '',
       endDate: ''
     });
-    setSearchQuery(''); // Also clear search query on reset
-    setCurrentPage(1);
+    setSearchQuery('');
   };
 
   const formatDate = (dateString) => {
@@ -273,21 +319,15 @@ export default function OrdersManagement() {
 
   const exportToExcel = async () => {
     try {
-      // Determine which orders to export - selected orders if any are selected, otherwise filtered orders
+      // Determine which orders to export - selected orders if any are selected, otherwise all filtered orders
       const ordersToExport = selectedOrders.length > 0 
         ? orders.filter(order => selectedOrders.includes(order._id))
         : filteredOrders;
       
       // Create a simpler Excel structure focusing on number and capacity
       const excelData = ordersToExport.map(order => ({
-        // 'Order ID': order._id,
-        // 'Reference': order.orderReference || 'N/A',
         'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
         'Capacity (GB)': order.capacity ? (order.capacity/1000).toFixed(1) : 0,
-        // 'Bundle Type': order.bundleType || 'N/A',
-        // 'Price': order.price ? `₵${order.price.toFixed(2)}` : '₵0.00',
-        // 'Status': order.status || 'N/A',
-        // 'Date': formatDate(order.createdAt)
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -297,14 +337,8 @@ export default function OrdersManagement() {
       // Auto-size columns
       const maxWidth = excelData.reduce((w, r) => Math.max(w, r['Recipient Number'].length), 10);
       const wscols = [
-        { wch: 24 },  // Order ID
-        { wch: 10 },  // Reference
         { wch: maxWidth }, // Recipient Number 
-        { wch: 12 },  // Capacity
-        { wch: 15 },  // Bundle Type
-        { wch: 10 },  // Price
-        { wch: 10 },  // Status
-        { wch: 20 }   // Date
+        { wch: 12 },       // Capacity
       ];
       worksheet['!cols'] = wscols;
       
@@ -329,46 +363,54 @@ export default function OrdersManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
           <div className="flex flex-wrap gap-2">
-          {selectedOrders.length > 0 ? (
-  <div className="flex flex-wrap items-center gap-2">
-    <span className="text-sm text-gray-700 dark:text-gray-300">
-      {selectedOrders.length} orders selected:
-    </span>
-    <select
-      className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md p-2"
-      value={bulkStatus}
-      onChange={(e) => {
-        if (e.target.value) {
-          handleBulkStatusChange(e.target.value);
-        } else {
-          setBulkStatus(e.target.value);
-        }
-      }}
-    >
-      <option value="">Bulk Update Status</option>
-      <option value="pending">Set All to Pending</option>
-      <option value="processing">Set All to Processing</option>
-      <option value="completed">Set All to Completed</option>
-      <option value="failed">Set All to Failed</option>
-      <option value="refunded">Set All to Refunded</option>
-    </select>
-  </div>
-) : null}
+            {selectedOrders.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedOrders.length} orders selected:
+                </span>
+                <select
+                  className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md p-2"
+                  value={bulkStatus}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleBulkStatusChange(e.target.value);
+                    } else {
+                      setBulkStatus(e.target.value);
+                    }
+                  }}
+                >
+                  <option value="">Bulk Update Status</option>
+                  <option value="pending">Set All to Pending</option>
+                  <option value="processing">Set All to Processing</option>
+                  <option value="completed">Set All to Completed</option>
+                  <option value="failed">Set All to Failed</option>
+                  <option value="refunded">Set All to Refunded</option>
+                </select>
+                <button
+                  onClick={handleSelectAllFiltered}
+                  className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  {selectedOrders.length === filteredOrders.length 
+                    ? "Deselect All Filtered" 
+                    : "Select All Filtered Orders"}
+                </button>
+              </div>
+            ) : null}
             <button
-  onClick={exportToExcel}
-  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
->
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-  {selectedOrders.length > 0 
-    ? `Export Selected (${selectedOrders.length})` 
-    : 'Export to Excel'}
-</button>
+              onClick={exportToExcel}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {selectedOrders.length > 0 
+                ? `Export Selected (${selectedOrders.length})` 
+                : `Export All Filtered (${filteredOrders.length})`}
+            </button>
           </div>
         </div>
 
-        {/* Search Bar - New Addition */}
+        {/* Search Bar */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -477,12 +519,16 @@ export default function OrdersManagement() {
           </form>
         </div>
 
-        {/* Search Results Stats - New Addition */}
-        {searchQuery && (
-          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Found {filteredOrders.length} of {orders.length} orders matching "{searchQuery}"
-          </div>
-        )}
+        {/* Data Stats */}
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
+          <div>Total Orders: <span className="font-semibold">{orders.length}</span></div>
+          <div>Filtered Orders: <span className="font-semibold">{filteredOrders.length}</span></div>
+          <div>Current Page: <span className="font-semibold">{currentPage} of {totalPages}</span></div>
+          <div>Displayed Orders: <span className="font-semibold">{displayedOrders.length}</span></div>
+          {searchQuery && (
+            <div>Search Results: <span className="font-semibold">{filteredOrders.length} matching "{searchQuery}"</span></div>
+          )}
+        </div>
 
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-100 p-4 mb-4" role="alert">
@@ -506,7 +552,7 @@ export default function OrdersManagement() {
                           type="checkbox"
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
                           onChange={handleSelectAll}
-                          checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length}
+                          checked={displayedOrders.length > 0 && selectedOrders.length === displayedOrders.length}
                         />
                       </div>
                     </th>
@@ -522,8 +568,8 @@ export default function OrdersManagement() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredOrders.length > 0 ? (
-                    filteredOrders.map((order) => (
+                  {displayedOrders.length > 0 ? (
+                    displayedOrders.map((order) => (
                       <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -580,7 +626,7 @@ export default function OrdersManagement() {
                               {order.recipientNumber || 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.capacity ? (order.capacity/1000) : 'N/A'} 
+                              {order.capacity ? (order.capacity/1000) : 'N/A'} GB
                             </td>
                           </>
                         )}
@@ -615,7 +661,9 @@ export default function OrdersManagement() {
                   ) : (
                     <tr>
                       <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery ? "No orders found matching your search" : "No orders found"}
+                        {searchQuery || Object.values(filter).some(v => v !== '') 
+                          ? "No orders found matching your filters" 
+                          : "No orders found"}
                       </td>
                     </tr>
                   )}
@@ -631,8 +679,11 @@ export default function OrdersManagement() {
             <div className="flex-1 flex flex-wrap justify-between">
               <div className="mb-2 sm:mb-0">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Showing page <span className="font-medium">{currentPage}</span> of{' '}
-                  <span className="font-medium">{totalPages}</span> pages
+                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, filteredOrders.length)}
+                  </span> of{' '}
+                  <span className="font-medium">{filteredOrders.length}</span> orders
                 </p>
               </div>
               <div>
@@ -650,13 +701,16 @@ export default function OrdersManagement() {
                     </svg>
                   </button>
                   
-                  {/* Page numbers */}
+                  {/* Page numbers - more visible pages for better navigation */}
                   {[...Array(totalPages).keys()].map((number) => {
                     const pageNumber = number + 1;
+                    
+                    // Show first and last pages, and a range around current page
                     if (
                       pageNumber === 1 ||
                       pageNumber === totalPages ||
-                      (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
+                      (pageNumber >= Math.max(1, currentPage - 2) && 
+                       pageNumber <= Math.min(totalPages, currentPage + 2))
                     ) {
                       return (
                         <button
@@ -674,12 +728,16 @@ export default function OrdersManagement() {
                     }
                     
                     // Show ellipsis for gaps
-                    if (pageNumber === 2 && currentPage > 3) {
-                      return <span key="ellipsis-start" className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">...</span>;
-                    }
-                    
-                    if (pageNumber === totalPages - 1 && currentPage < totalPages - 2) {
-                      return <span key="ellipsis-end" className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">...</span>;
+                    if ((pageNumber === 2 && currentPage > 4) ||
+                        (pageNumber === totalPages - 1 && currentPage < totalPages - 3)) {
+                      return (
+                        <span 
+                          key={`ellipsis-${pageNumber}`} 
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          ...
+                        </span>
+                      );
                     }
                     
                     return null;
@@ -705,5 +763,5 @@ export default function OrdersManagement() {
       </div>
 
     </AdminLayout>
-  )
-};
+  );
+}
