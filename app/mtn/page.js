@@ -201,7 +201,7 @@ const BundleFilter = () => {
                 <div className="flex flex-col items-center justify-center p-5 space-y-3 bg-yellow-400">
                   <h3 className="text-3xl font-bold">MTN</h3>
                   <h3 className="text-xl font-bold">
-                    {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                    {(bundle.capacity).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 text-white bg-black rounded-b-lg">

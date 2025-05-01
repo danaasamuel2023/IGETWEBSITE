@@ -381,7 +381,7 @@ const BundleManagement = () => {
                     {bundles.map((bundle) => (
                       <tr key={bundle._id} className="border-t border-gray-200 dark:border-gray-700">
                         <td className="p-2 text-black dark:text-white">
-                          {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                          {(bundle.capacity).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                         </td>
                         <td className="p-2 text-black dark:text-white">
                           GH₵ {parseFloat(bundle.price).toFixed(2)}

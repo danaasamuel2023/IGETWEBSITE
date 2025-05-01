@@ -187,7 +187,7 @@ const TelecelBundleCards = () => {
                 <div className="flex flex-col items-center justify-center p-5 space-y-3 bg-red-600">
                   <h3 className="text-3xl font-bold text-white">TELECEL</h3>
                   <h3 className="text-xl font-bold text-white">
-                    {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                    {(bundle.capacity ).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 text-white bg-black rounded-b-lg">
@@ -196,7 +196,7 @@ const TelecelBundleCards = () => {
                     <p className="text-sm font-bold">Price</p>
                   </div>
                   <div className="flex flex-col items-center justify-center p-3 text-center">
-                    <p className="text-lg">{bundle.validity || "30 Days"}</p>
+                    <p className="text-lg">{bundle.validity || "60 Days"}</p>
                     <p className="text-sm font-bold">Duration</p>
                   </div>
                 </div>

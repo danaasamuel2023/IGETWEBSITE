@@ -11,20 +11,40 @@ const ATFlexiNetBundleCards = () => {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [processingOrder, setProcessingOrder] = useState(false);
 
-  // Fetch bundles from API
+  // Fetch bundles from API with authorization
   useEffect(() => {
     const fetchBundles = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get('https://iget.onrender.com/api/iget/bundle');
+        
+        // Get token from localStorage
+        const token = localStorage.getItem('igettoken');
+        
+        if (!token) {
+          setMessage({ 
+            text: 'Please login to view available data bundles', 
+            type: 'error' 
+          });
+          setIsLoading(false);
+          return;
+        }
+        
+        // Make API request with authorization header
+        const response = await axios.get('https://iget.onrender.com/api/iget/bundle', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
         // Filter for AT bundles only
         const atBundles = response.data.data.filter(bundle => 
-          bundle.network === 'at' || bundle.type === 'AT-flexinet');
+          bundle.network === 'AT-ishare' || bundle.type === 'AT-ishare');
         setBundles(atBundles);
         setFilteredBundles(atBundles);
       } catch (err) {
         console.error('Failed to fetch bundles:', err);
-        setMessage({ text: 'Failed to load bundles. Please try again later.', type: 'error' });
+        const errorMessage = err.response?.data?.message || 'Failed to load bundles. Please try again later.';
+        setMessage({ text: errorMessage, type: 'error' });
       } finally {
         setIsLoading(false);
       }
@@ -64,6 +84,7 @@ const ATFlexiNetBundleCards = () => {
       return;
     }
     
+    // Commented out for flexibility, but you can uncomment if strict validation is needed
     // if (!validatePhoneNumber(phoneNumber)) {
     //   setMessage({ text: 'Please enter a valid AT phone number', type: 'error' });
     //   return;
@@ -86,7 +107,7 @@ const ATFlexiNetBundleCards = () => {
           recipientNumber: phoneNumber,
           capacity: bundle.capacity,
           price: parseFloat(bundle.price),
-          bundleType: bundle.type || 'AT-flexinet'
+          bundleType: bundle.type || 'AT-ishare'
         },
         {
           headers: {
@@ -97,8 +118,9 @@ const ATFlexiNetBundleCards = () => {
       
       if (response.data.success) {
         setMessage({ 
-          text: `${(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)}GB data bundle purchased successfully for ${phoneNumber}`, 
-          type: 'success' 
+          text: `${(bundle.capacity).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)}GB data bundle purchased successfully for ${phoneNumber}`, 
+          type: 'success',
+          orderDetails: response.data.data // Store order details for display
         });
         setSelectedBundleIndex(null);
         setPhoneNumber('');
@@ -123,6 +145,27 @@ const ATFlexiNetBundleCards = () => {
     return (
       <div className="flex justify-center items-center py-20">
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Display login message if no token is found
+  if (!localStorage.getItem('igettoken')) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center mb-6">
+          <ATLogo />
+          <h1 className="text-3xl font-bold ml-4">AT FLEXINET Data Bundles</h1>
+        </div>
+        <div className="bg-yellow-100 p-10 text-center rounded-lg border border-yellow-400">
+          <p className="text-lg text-yellow-800">Please login to view and purchase AT FLEXINET data bundles.</p>
+          <button 
+            className="mt-4 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none"
+            onClick={() => window.location.href = '/login'} // Adjust the login URL as needed
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
@@ -164,7 +207,7 @@ const ATFlexiNetBundleCards = () => {
                     <ATLogo />
                   </div>
                   <h3 className="text-xl font-bold text-white">
-                    {(bundle.capacity / 1000).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
+                    {(bundle.capacity).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                   </h3>
                 </div>
                 <div className="grid grid-cols-2 text-white bg-black"
