@@ -95,7 +95,7 @@ export default function ApiDocumentation() {
                   <pre className="text-sm overflow-x-auto dark:text-gray-200">
 {`{
   "recipientNumber": "0201234567",    // Required: Phone number starting with 0
-  "capacity": 100,                    // Required: Bundle capacity in MB
+  "capacity": 1,                    // Required: Bundle capacity in GB
   "bundleType": "mtnup2u"             // Required: Bundle type (see Bundle Types section)
 }`}
                   </pre>

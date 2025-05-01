@@ -6,6 +6,7 @@ import axios from 'axios';
 import Head from 'next/head';
 import Link from 'next/link';
 import AdminLayout from '@/components/adminWraper';
+import { format } from 'date-fns';
 
 export default function UsersManagement() {
   const [users, setUsers] = useState([]);
@@ -14,10 +15,15 @@ export default function UsersManagement() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [depositAmount, setDepositAmount] = useState('');
   const [depositDescription, setDepositDescription] = useState('');
+  const [debitAmount, setDebitAmount] = useState('');
+  const [debitDescription, setDebitDescription] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [newRole, setNewRole] = useState('user');
+  const [transactionHistory, setTransactionHistory] = useState([]);
+  const [showTransactionHistory, setShowTransactionHistory] = useState(false);
+  const [transactionLoading, setTransactionLoading] = useState(false);
   
   const router = useRouter();
 
@@ -63,6 +69,29 @@ export default function UsersManagement() {
     }
   };
 
+  const fetchUserTransactions = async (userId) => {
+    try {
+      setTransactionLoading(true);
+      const response = await axios.get(`https://iget.onrender.com/api/admin/users/${userId}/transactions`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+        }
+      });
+      
+      if (response.data && Array.isArray(response.data.data)) {
+        setTransactionHistory(response.data.data);
+      } else {
+        console.error('Unexpected transaction API response format:', response.data);
+        setTransactionHistory([]);
+      }
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setTransactionHistory([]);
+    } finally {
+      setTransactionLoading(false);
+    }
+  };
+
   const handleOpenModal = (type, user) => {
     setSelectedUser(user);
     setModalType(type);
@@ -71,6 +100,15 @@ export default function UsersManagement() {
     if (type === 'changeRole') {
       // Initialize with the user's current role
       setNewRole(user.role || 'user');
+    } else if (type === 'deposit') {
+      setDepositAmount('');
+      setDepositDescription('');
+    } else if (type === 'debit') {
+      setDebitAmount('');
+      setDebitDescription('');
+    } else if (type === 'transactions') {
+      fetchUserTransactions(user._id);
+      setShowTransactionHistory(true);
     }
   };
 
@@ -79,8 +117,11 @@ export default function UsersManagement() {
     setSelectedUser(null);
     setDepositAmount('');
     setDepositDescription('');
+    setDebitAmount('');
+    setDebitDescription('');
     setModalType('');
     setError(null); // Clear any errors when closing modal
+    setShowTransactionHistory(false);
   };
 
   const handleDeleteUser = async () => {
@@ -165,6 +206,44 @@ export default function UsersManagement() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add funds');
       console.error('Error adding funds:', err);
+    }
+  };
+
+  const handleDebit = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!debitAmount || isNaN(debitAmount) || parseFloat(debitAmount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+    
+    // Check if user has sufficient balance
+    if (selectedUser.wallet?.balance < parseFloat(debitAmount)) {
+      setError('Insufficient wallet balance');
+      return;
+    }
+    
+    try {
+      const response = await axios.post(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/wallet/debit`, {
+        amount: parseFloat(debitAmount),
+        description: debitDescription
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+        }
+      });
+      
+      // Update the user's wallet balance in the UI
+      setUsers(users.map(user => 
+        user._id === selectedUser._id 
+          ? { ...user, wallet: { ...user.wallet, balance: (user.wallet?.balance || 0) - parseFloat(debitAmount) } } 
+          : user
+      ));
+      
+      handleCloseModal();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to deduct funds');
+      console.error('Error deducting funds:', err);
     }
   };
 
@@ -285,14 +364,26 @@ export default function UsersManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {(user.wallet?.balance || 0).toFixed(2)} {user.wallet?.currency || 'USD'}
+                        <div className="flex flex-col">
+                          <span>{(user.wallet?.balance || 0).toFixed(2)} {user.wallet?.currency || 'USD'}</span>
+                          <button 
+                            onClick={() => handleOpenModal('transactions', user)}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 mt-1 dark:text-indigo-400 dark:hover:text-indigo-300">
+                            View Transactions
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex flex-col sm:flex-row gap-2">
                           <button 
                             onClick={() => handleOpenModal('deposit', user)}
-                            className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-2 py-1 rounded dark:bg-indigo-900 dark:text-indigo-200 dark:hover:bg-indigo-800">
-                            Add Funds
+                            className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800">
+                            Credit
+                          </button>
+                          <button 
+                            onClick={() => handleOpenModal('debit', user)}
+                            className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800">
+                            Debit
                           </button>
                           <button 
                             onClick={() => handleOpenModal('changeRole', user)}
@@ -341,7 +432,7 @@ export default function UsersManagement() {
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
-              <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full dark:bg-gray-800">
+              <div className={`inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle ${modalType === 'transactions' ? 'sm:max-w-4xl' : 'sm:max-w-lg'} sm:w-full dark:bg-gray-800`}>
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 dark:bg-gray-800">
                   <div className="sm:flex sm:items-start">
                     {modalType === 'deleteUser' && (
@@ -381,10 +472,10 @@ export default function UsersManagement() {
 
                     {modalType === 'deposit' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Add Funds to Wallet</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Credit User Wallet</h3>
                         <div className="mt-2">
                           <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
-                            Add funds to {selectedUser.username}'s wallet.
+                            Add funds to {selectedUser.username}'s wallet. Current balance: {(selectedUser.wallet?.balance || 0).toFixed(2)} {selectedUser.wallet?.currency || 'USD'}
                           </p>
                           <form onSubmit={handleDeposit}>
                             <div className="mb-4">
@@ -406,9 +497,46 @@ export default function UsersManagement() {
                                 type="text"
                                 id="description"
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                placeholder="Funds added by admin"
+                                placeholder="Credit reason"
                                 value={depositDescription}
                                 onChange={(e) => setDepositDescription(e.target.value)}
+                              />
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    )}
+
+                    {modalType === 'debit' && (
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Debit User Wallet</h3>
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
+                            Deduct funds from {selectedUser.username}'s wallet. Current balance: {(selectedUser.wallet?.balance || 0).toFixed(2)} {selectedUser.wallet?.currency || 'USD'}
+                          </p>
+                          <form onSubmit={handleDebit}>
+                            <div className="mb-4">
+                              <label htmlFor="debit-amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount ({selectedUser.wallet?.currency || 'USD'})</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                id="debit-amount"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                placeholder="0.00"
+                                value={debitAmount}
+                                onChange={(e) => setDebitAmount(e.target.value)}
+                                required
+                              />
+                            </div>
+                            <div className="mb-4">
+                              <label htmlFor="debit-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (Optional)</label>
+                              <input
+                                type="text"
+                                id="debit-description"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                placeholder="Debit reason"
+                                value={debitDescription}
+                                onChange={(e) => setDebitDescription(e.target.value)}
                               />
                             </div>
                           </form>
@@ -438,6 +566,74 @@ export default function UsersManagement() {
                               </select>
                             </div>
                           </form>
+                        </div>
+                      </div>
+                    )}
+
+                    {modalType === 'transactions' && (
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                          Transaction History - {selectedUser.username}
+                        </h3>
+                        <div className="mt-4">
+                          {transactionLoading ? (
+                            <div className="flex justify-center items-center h-40">
+                              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 dark:border-blue-400"></div>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                  <tr>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Date</th>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Type</th>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Amount</th>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Balance</th>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Description</th>
+                                    <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">Admin</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                                  {transactionHistory.length > 0 ? (
+                                    transactionHistory.map((transaction) => (
+                                      <tr key={transaction._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                          {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap">
+                                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                            ${transaction.type === 'deposit' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
+                                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                                            {transaction.type === 'deposit' ? 'Credit' : 'Debit'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                          <span className={transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}>
+                                            {transaction.type === 'deposit' ? '+' : '-'}{transaction.amount.toFixed(2)} {transaction.currency || 'USD'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                          {transaction.balanceAfter?.toFixed(2) || 'N/A'} {transaction.currency || 'USD'}
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                          {transaction.description || 'N/A'}
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                                          {transaction.processedByInfo?.username || 'N/A'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan="6" className="px-4 py-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        No transactions found
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -505,10 +701,29 @@ export default function UsersManagement() {
                     <>
                       <button
                         type="button"
-                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
                         onClick={handleDeposit}
                       >
-                        Add Funds
+                        Credit Funds
+                      </button>
+                      <button
+                        type="button"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
+                        onClick={handleCloseModal}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  )}
+
+                  {modalType === 'debit' && (
+                    <>
+                      <button
+                        type="button"
+                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        onClick={handleDebit}
+                      >
+                        Debit Funds
                       </button>
                       <button
                         type="button"
@@ -537,6 +752,16 @@ export default function UsersManagement() {
                         Cancel
                       </button>
                     </>
+                  )}
+
+                  {modalType === 'transactions' && (
+                    <button
+                      type="button"
+                      className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
+                      onClick={handleCloseModal}
+                    >
+                      Close
+                    </button>
                   )}
                 </div>
               </div>
