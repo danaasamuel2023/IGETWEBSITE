@@ -302,7 +302,7 @@ export default function UserOrders() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                          {order.capacity ? `${order.capacity/1000} GB` : 'N/A'} 
+                          {order.capacity ? `${order.capacity} GB` : 'N/A'} 
                           {order.bundleType && ` (${order.bundleType})`}
                         </div>
                         {order.recipientNumber && (

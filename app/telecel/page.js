@@ -235,7 +235,7 @@ const TelecelBundleCards = () => {
             <div className="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
               <div className="flex justify-between mb-3">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Bundle:</span>
-                <span className="text-black dark:text-white font-medium">{(selectedBundle.capacity / 1000).toFixed(selectedBundle.capacity % 1000 === 0 ? 0 : 1)} GB</span>
+                <span className="text-black dark:text-white font-medium">{(selectedBundle.capacity).toFixed(selectedBundle.capacity % 1000 === 0 ? 0 : 1)} GB</span>
               </div>
               <div className="flex justify-between mb-3">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Price:</span>

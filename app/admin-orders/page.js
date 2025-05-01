@@ -327,7 +327,7 @@ export default function OrdersManagement() {
       // Create a simpler Excel structure focusing on number and capacity
       const excelData = ordersToExport.map(order => ({
         'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
-        'Capacity (GB)': order.capacity ? (order.capacity/1000).toFixed(1) : 0,
+        'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -626,7 +626,7 @@ export default function OrdersManagement() {
                               {order.recipientNumber || 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.capacity ? (order.capacity/1000) : 'N/A'} GB
+                              {order.capacity ? (order.capacity) : 'N/A'} GB
                             </td>
                           </>
                         )}
