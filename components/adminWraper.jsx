@@ -91,7 +91,7 @@ export default function AdminLayout({ children }) {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="flex justify-center items-center min-h-screen bg-gray-100 dark:bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
@@ -100,7 +100,7 @@ export default function AdminLayout({ children }) {
   // If not authenticated or not admin, this will already be redirected by useEffect
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       {/* Mobile sidebar backdrop - only show on mobile when sidebar is open */}
       {sidebarOpen && (
         <div 
@@ -184,6 +184,17 @@ export default function AdminLayout({ children }) {
                 </span>
               </span>
             </Link>
+            {/* New SMS All Link */}
+            <Link href="/sms">
+              <span className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${router.pathname === '/admin/sms-all' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'} cursor-pointer`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <span className={`transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 hidden md:block'}`}>
+                  SMS
+                </span>
+              </span>
+            </Link>
             {/* <Link href="/admin/settings">
               <span className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${router.pathname === '/admin/settings' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'} cursor-pointer`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -217,14 +228,14 @@ export default function AdminLayout({ children }) {
       {/* Main content - adjust width based on sidebar state */}
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'ml-0 md:ml-16'}`}>
         {/* Top navigation */}
-        <div className="bg-white shadow-sm z-10">
+        <div className="bg-white dark:bg-gray-800 shadow-sm z-10">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16 items-center">
               <div className="flex items-center">
                 {/* Mobile menu button - only visible on mobile */}
                 <button
                   onClick={toggleSidebar}
-                  className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                  className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
                 >
                   <span className="sr-only">Open sidebar</span>
                   <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -237,8 +248,8 @@ export default function AdminLayout({ children }) {
               
               <div className="flex items-center justify-end flex-1">
                 <div className="ml-4 flex items-center md:ml-6">
-                  <Link href="/" className="text-gray-500 hover:text-gray-700">
-                    <span className="bg-gray-100 p-2 rounded-full">
+                  <Link href="/" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    <span className="bg-gray-100 dark:bg-gray-700 p-2 rounded-full">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                       </svg>
@@ -251,7 +262,7 @@ export default function AdminLayout({ children }) {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto bg-gray-100 p-4">
+        <main className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 p-4">
           {children}
         </main>
       </div>
