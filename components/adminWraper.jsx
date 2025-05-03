@@ -109,7 +109,7 @@ export default function AdminLayout({ children }) {
         ></div>
       )}
       
-      {/* Sidebar - collapsed state controlled by sidebarOpen */}
+      {/* Sidebar - collapsed state controlled by sidebarOpen - Lower z-index to prevent overlap with modals */}
       <div 
         className={`fixed inset-y-0 left-0 z-20 bg-gray-800 transition-all duration-300 transform
           ${sidebarOpen ? 'md:w-64 w-64' : 'w-0 md:w-16'} overflow-hidden`}
@@ -194,7 +194,18 @@ export default function AdminLayout({ children }) {
                 </span>
               </span>
             </Link>
-            {/* New SMS All Link */}
+            {/* Top Sale Link */}
+            <Link href="/top-sale">
+              <span className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${router.pathname === '/top-sale' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'} cursor-pointer`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <span className={`transition-opacity duration-300 ${sidebarOpen ? 'opacity-100' : 'opacity-0 hidden md:block'}`}>
+                  Top Sale
+                </span>
+              </span>
+            </Link>
+            {/* SMS Link */}
             <Link href="/sms">
               <span className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${router.pathname === '/admin/sms-all' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'} cursor-pointer`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -237,7 +248,7 @@ export default function AdminLayout({ children }) {
 
       {/* Main content - adjust width based on sidebar state */}
       <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'ml-0 md:ml-16'}`}>
-        {/* Top navigation */}
+        {/* Top navigation - Lower z-index to prevent overlap with modals */}
         <div className="bg-white dark:bg-gray-800 shadow-sm z-10">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16 items-center">
@@ -271,8 +282,8 @@ export default function AdminLayout({ children }) {
           </div>
         </div>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 p-4">
+        {/* Page content - Ensure it doesn't have a z-index that conflicts with modals */}
+        <main className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 p-4 relative">
           {children}
         </main>
       </div>

@@ -1,6 +1,6 @@
 // pages/admin/users/index.js
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Head from 'next/head';
@@ -24,6 +24,9 @@ export default function UsersManagement() {
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
+  const [totalMoney, setTotalMoney] = useState(0);
+  const [animateTotal, setAnimateTotal] = useState(false);
+  const moneyCounterRef = useRef(null);
   
   const router = useRouter();
 
@@ -31,6 +34,58 @@ export default function UsersManagement() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Calculate total money when users change
+  useEffect(() => {
+    if (users.length > 0) {
+      calculateTotalMoney();
+    }
+  }, [users]);
+
+  // Handle animation effect when total money changes
+  useEffect(() => {
+    if (totalMoney > 0) {
+      setAnimateTotal(true);
+      const timer = setTimeout(() => {
+        setAnimateTotal(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [totalMoney]);
+
+  // Function to animate counting from 0 to total
+  useEffect(() => {
+    if (moneyCounterRef.current && totalMoney > 0) {
+      animateValue(0, totalMoney, 1500);
+    }
+  }, [totalMoney, animateTotal]);
+
+  const animateValue = (start, end, duration) => {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const current = Math.floor(progress * (end - start) + start);
+      if (moneyCounterRef.current) {
+        moneyCounterRef.current.textContent = current.toFixed(2);
+      }
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        if (moneyCounterRef.current) {
+          moneyCounterRef.current.textContent = end.toFixed(2);
+        }
+      }
+    };
+    window.requestAnimationFrame(step);
+  };
+
+  const calculateTotalMoney = () => {
+    const total = users.reduce((acc, user) => {
+      return acc + (user.wallet?.balance || 0);
+    }, 0);
+    setTotalMoney(total);
+  };
 
   const fetchUsers = async () => {
     try {
@@ -297,6 +352,22 @@ export default function UsersManagement() {
       <div className="p-4 sm:p-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 dark:text-white">User Management</h1>
+          
+          {/* Total Money Card */}
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md mb-4 sm:mb-0 sm:mr-4">
+            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users Wallet</h2>
+            <div className="flex items-end mt-1">
+              <span className="text-2xl font-bold text-green-600 dark:text-green-400 transition-all duration-500 ease-in-out">
+                GHS<span 
+                  ref={moneyCounterRef}
+                  className={`${animateTotal ? 'text-green-600 scale-110' : 'text-green-600'} transition-all duration-500`}
+                >
+                  {totalMoney.toFixed(2)}
+                </span>
+              </span>
+            </div>
+          </div>
+          
           <div className="relative w-full sm:w-64">
             <input
               type="text"
