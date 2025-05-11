@@ -24,6 +24,7 @@ export default function OrdersManagement() {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
   const [itemsPerPage] = useState(20);
+  const [senderID, setSenderID] = useState('EL VENDER'); // New state for sender ID
 
   // Fetch orders on component mount
   useEffect(() => {
@@ -158,13 +159,15 @@ export default function OrdersManagement() {
     setSearchQuery('');
   };
 
+  // Updated to include senderID
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setLoading(true);
       setError(null);
       
       const response = await axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
-        status: newStatus
+        status: newStatus,
+        senderID: senderID // Include senderID in the request
       }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
@@ -199,6 +202,7 @@ export default function OrdersManagement() {
     }
   };
 
+  // Updated to include senderID
   const handleBulkStatusChange = async (newStatus) => {
     if (!newStatus || selectedOrders.length === 0) {
       setError('Please select at least one order and a status to update');
@@ -211,7 +215,8 @@ export default function OrdersManagement() {
       
       const updatePromises = selectedOrders.map(orderId => 
         axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
-          status: newStatus
+          status: newStatus,
+          senderID: senderID // Include senderID in the request
         }, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('igettoken')}`
@@ -360,9 +365,26 @@ export default function OrdersManagement() {
       </Head>
       
       <div className="p-4 sm:p-6 max-w-7xl mx-auto bg-white dark:bg-gray-900">
+        {/* Header with Sender ID input */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* New Sender ID input field */}
+            <div className="flex items-center space-x-2">
+              <label htmlFor="senderID" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                SMS Sender ID:
+              </label>
+              <input
+                type="text"
+                id="senderID"
+                value={senderID}
+                onChange={(e) => setSenderID(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md p-2 text-sm"
+                placeholder="Sender ID"
+                maxLength="11"
+              />
+            </div>
+            
             {selectedOrders.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -519,12 +541,13 @@ export default function OrdersManagement() {
           </form>
         </div>
 
-        {/* Data Stats */}
+        {/* Data Stats with Sender ID info */}
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
           <div>Total Orders: <span className="font-semibold">{orders.length}</span></div>
           <div>Filtered Orders: <span className="font-semibold">{filteredOrders.length}</span></div>
           <div>Current Page: <span className="font-semibold">{currentPage} of {totalPages}</span></div>
           <div>Displayed Orders: <span className="font-semibold">{displayedOrders.length}</span></div>
+          <div>SMS Sender ID: <span className="font-semibold">{senderID}</span></div>
           {searchQuery && (
             <div>Search Results: <span className="font-semibold">{filteredOrders.length} matching "{searchQuery}"</span></div>
           )}
@@ -643,18 +666,22 @@ export default function OrdersManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <select 
-                            className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
-                            value={order.status || ''}
-                            onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                          >
-                            <option value="" disabled>Change Status</option>
-                            <option value="pending" className="bg-white dark:bg-gray-700">Pending</option>
-                            <option value="processing" className="bg-white dark:bg-gray-700">Processing</option>
-                            <option value="completed" className="bg-white dark:bg-gray-700">Completed</option>
-                            <option value="failed" className="bg-white dark:bg-gray-700">Failed</option>
-                            <option value="refunded" className="bg-white dark:bg-gray-700">Refunded</option>
-                          </select>
+                          {/* Updated to show sender ID will be used */}
+                          <div className="flex flex-col space-y-2">
+                            <select 
+                              className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
+                              value={order.status || ''}
+                              onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                            >
+                              <option value="" disabled>Change Status</option>
+                              <option value="pending" className="bg-white dark:bg-gray-700">Pending</option>
+                              <option value="processing" className="bg-white dark:bg-gray-700">Processing</option>
+                              <option value="completed" className="bg-white dark:bg-gray-700">Completed</option>
+                              <option value="failed" className="bg-white dark:bg-gray-700">Failed</option>
+                              <option value="refunded" className="bg-white dark:bg-gray-700">Refunded</option>
+                            </select>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">SMS: {senderID}</span>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -761,7 +788,6 @@ export default function OrdersManagement() {
           </div>
         )}
       </div>
-
     </AdminLayout>
   );
 }

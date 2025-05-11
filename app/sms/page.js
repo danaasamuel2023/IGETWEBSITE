@@ -428,7 +428,7 @@ const SMSMessaging = () => {
             type="text" 
             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             value={senderID}
-            onChange={(e) => setSenderID(e.target.value.toUpperCase())}
+            onChange={(e) => setSenderID(e.target.value)}
             placeholder="Sender ID (max 11 characters)"
             maxLength={11}
           />
