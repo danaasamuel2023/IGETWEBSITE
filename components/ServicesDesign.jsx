@@ -69,7 +69,7 @@ const DashboardPage = () => {
     if (capacity >= 1000) {
       return (capacity / 1000).toFixed(1) + " GB";
     }
-    return capacity + " MB";
+    return capacity + " GB";
   };
 
   // Format date to readable format
@@ -104,7 +104,7 @@ const DashboardPage = () => {
 
   // Calculate total GB sold today
   const totalGbSold = dashboardData.todayOrders?.reduce((total, order) => {
-    const capacityInGb = order.capacity >= 1000 ? order.capacity / 1000 : order.capacity / 1000;
+    const capacityInGb = order.capacity >= 1000 ? order.capacity : order.capacity ;
     return total + capacityInGb;
   }, 0).toFixed(1);
 
