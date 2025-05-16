@@ -220,6 +220,13 @@ const Navigation = () => {
            {user ? (
              <>
                <Link 
+                 href="/bulk" 
+                 className="hover:text-gray-300 transition-colors"
+                 onClick={handleLinkClick}
+               >
+                 Bulk Purchase
+               </Link>
+               <Link 
                  href="/orders" 
                  className="hover:text-gray-300 transition-colors"
                  onClick={handleLinkClick}
@@ -258,7 +265,11 @@ const Navigation = () => {
                    className="flex items-center bg-gray-800 rounded-full px-4 py-2 hover:bg-gray-700"
                    onClick={toggleMenu}
                  >
-                   <span className="mr-2">{user.username}</span>
+                   <span className="mr-2 max-w-[120px] truncate" title={user.username}>
+                     {user.username && user.username.includes('@') 
+                       ? user.username.split('@')[0] 
+                       : user.username}
+                   </span>
                    {balance ? (
                      <span className="text-xs bg-green-500 text-black rounded-full px-2 py-1">
                        {balance.balance.toFixed(2)} {balance.currency}
@@ -389,6 +400,13 @@ const Navigation = () => {
                  {user ? (
                    <>
                      <Link 
+                       href="/bulk" 
+                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       onClick={handleLinkClick}
+                     >
+                       Bulk Purchase
+                     </Link>
+                     <Link 
                        href="/orders" 
                        className="block px-4 py-2 text-white hover:bg-gray-800"
                        onClick={handleLinkClick}
@@ -424,7 +442,12 @@ const Navigation = () => {
 
                      {balance && (
                        <div className="px-4 py-2 text-white">
-                         Balance: {balance.balance.toFixed(2)} {balance.currency}
+                         <span className="font-medium text-gray-400">Username:</span> 
+                         <span className="ml-2">{user.username}</span>
+                         <div className="mt-1">
+                           <span className="font-medium text-gray-400">Balance:</span> 
+                           <span className="ml-2">{balance.balance.toFixed(2)} {balance.currency}</span>
+                         </div>
                        </div>
                      )}
 
