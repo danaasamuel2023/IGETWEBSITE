@@ -220,6 +220,13 @@ const Navigation = () => {
            {user ? (
              <>
                <Link 
+                 href="/wallet" 
+                 className="hover:text-gray-300 transition-colors"
+                 onClick={handleLinkClick}
+               >
+                 Wallet
+               </Link>
+               <Link 
                  href="/bulk" 
                  className="hover:text-gray-300 transition-colors"
                  onClick={handleLinkClick}
@@ -373,22 +380,22 @@ const Navigation = () => {
                <div className="space-y-4 mt-12">
                  <Link 
                    href="/" 
-                   className="block px-4 py-2 text-white hover:bg-gray-800"
+                   className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                    onClick={handleLinkClick}
                  >
                    Home
                  </Link>
 
                  {/* Services Section for Mobile - Always visible */}
-                 <div>
+                 <div className="bg-gray-900 rounded-md overflow-hidden">
                    <div className="px-4 py-2 text-white font-medium border-b border-gray-700 mb-2">
                      Services
                    </div>
-                   <div className="pl-4 space-y-2">
+                   <div className="pl-4 space-y-2 pb-2">
                      {serviceTypes.map((service, index) => (
                        <button
                          key={index}
-                         className="block w-full text-left px-4 py-2 text-white hover:bg-gray-800 capitalize"
+                         className="block w-full text-left px-4 py-2 text-white hover:bg-gray-800 capitalize rounded-md transition-colors"
                          onClick={() => navigateToService(service)}
                        >
                          {service}
@@ -400,22 +407,29 @@ const Navigation = () => {
                  {user ? (
                    <>
                      <Link 
+                       href="/wallet" 
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors bg-blue-600"
+                       onClick={handleLinkClick}
+                     >
+                       Wallet
+                     </Link>
+                     <Link 
                        href="/bulk" 
-                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        Bulk Purchase
                      </Link>
                      <Link 
                        href="/orders" 
-                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        My Orders
                      </Link>
                      <Link 
                        href="/api-doc" 
-                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        API Documentation
@@ -425,14 +439,14 @@ const Navigation = () => {
                        <>
                          <Link 
                            href="/admin-users" 
-                           className="block px-4 py-2 text-white hover:bg-gray-800"
+                           className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                            onClick={handleLinkClick}
                          >
                            Admin
                          </Link>
                          <Link 
                            href="/admin-orders" 
-                           className="block px-4 py-2 text-white hover:bg-gray-800"
+                           className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                            onClick={handleLinkClick}
                          >
                            Transactions
@@ -441,7 +455,7 @@ const Navigation = () => {
                      )}
 
                      {balance && (
-                       <div className="px-4 py-2 text-white">
+                       <div className="px-4 py-2 text-white bg-gray-900 rounded-md">
                          <span className="font-medium text-gray-400">Username:</span> 
                          <span className="ml-2">{user.username}</span>
                          <div className="mt-1">
@@ -453,7 +467,7 @@ const Navigation = () => {
 
                      <Link 
                        href="/api-key" 
-                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        API Keys
@@ -461,7 +475,7 @@ const Navigation = () => {
 
                      <button 
                        onClick={handleLogout} 
-                       className="w-full text-left px-4 py-2 text-white hover:bg-gray-800"
+                       className="w-full text-left px-4 py-2 text-white hover:bg-gray-700 bg-red-700 rounded-md transition-colors"
                      >
                        Logout
                      </button>
@@ -470,14 +484,14 @@ const Navigation = () => {
                    <>
                      <Link 
                        href="/Signin" 
-                       className="block px-4 py-2 text-white hover:bg-gray-800"
+                       className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        Login
                      </Link>
                      <Link 
                        href="/Signin" 
-                       className="block px-4 py-2 text-white bg-blue-600 hover:bg-blue-700"
+                       className="block px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
                        onClick={handleLinkClick}
                      >
                        Register
