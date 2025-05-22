@@ -112,7 +112,7 @@ export default function RegisterPage() {
       firstName: '',
       lastName: '',
       phoneNumber: '',
-      price: 20
+      price: 2.5
     });
   };
   
