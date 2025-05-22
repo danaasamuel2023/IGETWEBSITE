@@ -219,13 +219,13 @@ const Navigation = () => {
 
            {user ? (
              <>
-               <Link 
+               {/* <Link 
                  href="/wallet" 
                  className="hover:text-gray-300 transition-colors"
                  onClick={handleLinkClick}
                >
                  Wallet
-               </Link>
+               </Link> */}
                <Link 
                  href="/bulk" 
                  className="hover:text-gray-300 transition-colors"
