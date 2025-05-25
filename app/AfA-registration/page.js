@@ -16,6 +16,9 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [afaBundle, setAfaBundle] = useState(null);
+  const [loadingPrice, setLoadingPrice] = useState(true);
+  const [userRole, setUserRole] = useState(null);
   
   useEffect(() => {
     // Check if user is authenticated
@@ -35,7 +38,48 @@ export default function RegisterPage() {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedTheme = localStorage.getItem('theme');
     setDarkMode(savedTheme === 'dark' || (!savedTheme && prefersDark));
+    
+    // Fetch AFA bundle pricing
+    fetchAfaBundle();
   }, []);
+  
+  const fetchAfaBundle = async () => {
+    try {
+      setLoadingPrice(true);
+      const token = localStorage.getItem('igettoken');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await fetch('https://iget.onrender.com/api/iget/bundle', { headers });
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // Find AFA bundle (you might need to adjust the filter based on your bundle structure)
+        const afaBundleData = data.data.find(bundle => 
+          bundle.type === 'AfA-registration' || 
+          bundle.name?.toLowerCase().includes('AfA-registration') ||
+          bundle.category === 'AfA-registration'
+        );
+        
+        if (afaBundleData) {
+          setAfaBundle(afaBundleData);
+          // Set the price in form data - use userPrice if available, otherwise standard price
+          const price = afaBundleData.userPrice !== undefined ? afaBundleData.userPrice : afaBundleData.price;
+          setFormData(prev => ({ ...prev, price }));
+        }
+        
+        // Set user role if available
+        if (data.userRole) {
+          setUserRole(data.userRole);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching AFA bundle:', error);
+      // Fallback to default price if API fails
+      setFormData(prev => ({ ...prev, price: 2.5 }));
+    } finally {
+      setLoadingPrice(false);
+    }
+  };
   
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -51,11 +95,17 @@ export default function RegisterPage() {
     });
   };
   
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setIsLoading(true);
     setError('');
     setSuccess(null);
+    
+    // Basic validation
+    if (!formData.firstName || !formData.lastName || !formData.phoneNumber) {
+      setError('Please fill in all required fields');
+      setIsLoading(false);
+      return;
+    }
     
     try {
       const token = localStorage.getItem('igettoken');
@@ -112,8 +162,21 @@ export default function RegisterPage() {
       firstName: '',
       lastName: '',
       phoneNumber: '',
-      price: 2.5
+      price: afaBundle ? (afaBundle.userPrice !== undefined ? afaBundle.userPrice : afaBundle.price) : 2.5
     });
+  };
+  
+  // Format price for display
+  const formatPrice = (price) => {
+    return `GH₵ ${parseFloat(price).toFixed(2)}`;
+  };
+  
+  // Get display price
+  const getDisplayPrice = () => {
+    if (afaBundle) {
+      return afaBundle.userPrice !== undefined ? afaBundle.userPrice : afaBundle.price;
+    }
+    return formData.price;
   };
   
   return (
@@ -127,7 +190,9 @@ export default function RegisterPage() {
       <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100">
         <div className="container mx-auto px-4 py-8">
           <header className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold">AFA Registration (2.5gh)</h1>
+            <h1 className="text-3xl font-bold">
+              AFA Registration {!loadingPrice && `(${formatPrice(getDisplayPrice())})`}
+            </h1>
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
@@ -135,6 +200,45 @@ export default function RegisterPage() {
               {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
           </header>
+
+          {/* User Role Display */}
+          {userRole && userRole !== 'user' && (
+            <div className="mb-4 text-center">
+              <div className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-lg">
+                Viewing prices as: <span className="font-bold capitalize">{userRole}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Loading Price */}
+          {loadingPrice && (
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500 mr-2"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Loading current pricing...</span>
+              </div>
+            </div>
+          )}
+
+          {/* AFA Bundle Info */}
+          {afaBundle && !loadingPrice && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6 max-w-lg mx-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">AFA Bundle Details</h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {/* {afaBundle.capacity && `${afaBundle.capacity} GB • `} */}
+                    {/* {afaBundle.validity || '90 Days'} */}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-yellow-800 dark:text-yellow-200">
+                    {formatPrice(getDisplayPrice())}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {!success ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-lg mx-auto">
@@ -147,7 +251,7 @@ export default function RegisterPage() {
                 </div>
               )}
               
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-6">
                 <div>
                   <label htmlFor="firstName" className="block mb-2 font-medium">
                     First Name
@@ -212,9 +316,10 @@ export default function RegisterPage() {
                 </div>
                 
                 <button 
-                  type="submit" 
+                  onClick={handleSubmit}
+                  type="button" 
                   className="w-full mt-8 px-4 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-semibold rounded-lg transition-colors duration-200 flex justify-center items-center"
-                  disabled={isLoading}
+                  disabled={isLoading || loadingPrice}
                 >
                   {isLoading ? (
                     <>
@@ -224,11 +329,13 @@ export default function RegisterPage() {
                       </svg>
                       Processing...
                     </>
+                  ) : loadingPrice ? (
+                    'Loading...'
                   ) : (
-                    'Submit Registration'
+                    `Submit Registration - ${formatPrice(getDisplayPrice())}`
                   )}
                 </button>
-              </form>
+                </div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-lg mx-auto text-center">
@@ -249,7 +356,7 @@ export default function RegisterPage() {
                     <div className="text-right font-medium">{success.order.recipientNumber}</div>
                     
                     <div className="text-left text-gray-600 dark:text-gray-400">Amount Paid:</div>
-                    <div className="text-right font-medium">GHS {success.order.price.toFixed(2)}</div>
+                    <div className="text-right font-medium">{formatPrice(success.order.price)}</div>
                     
                     <div className="text-left text-gray-600 dark:text-gray-400">Reference:</div>
                     <div className="text-right font-medium text-sm">{success.order.orderReference}</div>
