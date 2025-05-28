@@ -343,8 +343,10 @@ export default function RegisterPage() {
                 <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
                   <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Registration Successful!</h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">Your AFA registration has been completed successfully.</p>
+                <h2 className="text-2xl font-semibold mb-2">Registration Submitted!</h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-6 text-lg">
+                  Your request to onboard <span className="font-semibold text-blue-600 dark:text-blue-400">{success.order.recipientNumber}</span> on MTN AFA has been submitted for processing.
+                </p>
                 
                 <div className="w-full bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                   <h3 className="text-xl font-medium mb-4 text-left">Registration Details</h3>
