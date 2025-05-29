@@ -16,6 +16,36 @@ const Navigation = () => {
    const servicesDropdownRef = useRef(null);
    const mobileMenuRef = useRef(null);
 
+   // Helper function to check if user has admin privileges
+   const isAdmin = (userRole) => {
+     const adminRoles = ['admin', 'credit_admin', 'debit_admin'];
+     return adminRoles.includes(userRole);
+   };
+
+   // Helper function to get role display name
+   const getRoleDisplayName = (role) => {
+     switch(role) {
+       case 'admin': return 'Full Admin';
+       case 'credit_admin': return 'Credit Admin';
+       case 'debit_admin': return 'Debit Admin';
+       case 'agent': return 'Agent';
+       case 'Editor': return 'Editor';
+       default: return 'User';
+     }
+   };
+
+   // Helper function to get role badge color
+   const getRoleBadgeColor = (role) => {
+     switch(role) {
+       case 'admin': return 'bg-purple-500';
+       case 'credit_admin': return 'bg-green-500';
+       case 'debit_admin': return 'bg-red-500';
+       case 'agent': return 'bg-blue-500';
+       case 'Editor': return 'bg-yellow-500';
+       default: return 'bg-gray-500';
+     }
+   };
+
    // Check for authentication token on component mount and window focus
    useEffect(() => {
      const checkAuth = () => {
@@ -219,13 +249,6 @@ const Navigation = () => {
 
            {user ? (
              <>
-               {/* <Link 
-                 href="/wallet" 
-                 className="hover:text-gray-300 transition-colors"
-                 onClick={handleLinkClick}
-               >
-                 Wallet
-               </Link> */}
                <Link 
                  href="/bulk" 
                  className="hover:text-gray-300 transition-colors"
@@ -248,23 +271,31 @@ const Navigation = () => {
                  API Documentation
                </Link>
 
-               {user.role === 'admin' && (
-                 <>
+               {/* Enhanced Admin Access - Now includes all admin roles */}
+               {isAdmin(user.role) && (
+                 <div className="flex items-center space-x-4">
                    <Link 
                      href="/admin-users" 
-                     className="hover:text-gray-300 transition-colors"
+                     className="hover:text-gray-300 transition-colors flex items-center"
                      onClick={handleLinkClick}
                    >
-                     Admin
+                     <span>Admin Panel</span>
+                     <span className={`ml-2 px-2 py-1 text-xs rounded-full text-white ${getRoleBadgeColor(user.role)}`}>
+                       {getRoleDisplayName(user.role)}
+                     </span>
                    </Link>
-                   <Link 
-                     href="/admin-orders" 
-                     className="hover:text-gray-300 transition-colors"
-                     onClick={handleLinkClick}
-                   >
-                     Transactions
-                   </Link>
-                 </>
+                   
+                   {/* Only show Transactions link for full admins */}
+                   {user.role === 'admin' && (
+                     <Link 
+                       href="/admin-orders" 
+                       className="hover:text-gray-300 transition-colors"
+                       onClick={handleLinkClick}
+                     >
+                       Transactions
+                     </Link>
+                   )}
+                 </div>
                )}
 
                <div className="relative">
@@ -272,11 +303,19 @@ const Navigation = () => {
                    className="flex items-center bg-gray-800 rounded-full px-4 py-2 hover:bg-gray-700"
                    onClick={toggleMenu}
                  >
-                   <span className="mr-2 max-w-[120px] truncate" title={user.username}>
-                     {user.username && user.username.includes('@') 
-                       ? user.username.split('@')[0] 
-                       : user.username}
-                   </span>
+                   <div className="flex flex-col items-start mr-2">
+                     <span className="max-w-[120px] truncate text-sm" title={user.username}>
+                       {user.username && user.username.includes('@') 
+                         ? user.username.split('@')[0] 
+                         : user.username}
+                     </span>
+                     {/* Show role badge under username for admin users */}
+                     {isAdmin(user.role) && (
+                       <span className={`text-xs px-2 py-0.5 rounded-full text-white mt-1 ${getRoleBadgeColor(user.role)}`}>
+                         {getRoleDisplayName(user.role)}
+                       </span>
+                     )}
+                   </div>
                    {balance ? (
                      <span className="text-xs bg-green-500 text-black rounded-full px-2 py-1">
                        {balance.balance.toFixed(2)} {balance.currency}
@@ -435,32 +474,72 @@ const Navigation = () => {
                        API Documentation
                      </Link>
 
-                     {user.role === 'admin' && (
-                       <>
-                         <Link 
-                           href="/admin-users" 
-                           className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
-                           onClick={handleLinkClick}
-                         >
-                           Admin
-                         </Link>
-                         <Link 
-                           href="/admin-orders" 
-                           className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
-                           onClick={handleLinkClick}
-                         >
-                           Transactions
-                         </Link>
-                       </>
+                     {/* Enhanced Mobile Admin Section */}
+                     {isAdmin(user.role) && (
+                       <div className="bg-gray-900 rounded-md overflow-hidden">
+                         <div className="px-4 py-2 text-white font-medium border-b border-gray-700 mb-2 flex items-center justify-between">
+                           <span>Admin Panel</span>
+                           <span className={`px-2 py-1 text-xs rounded-full text-white ${getRoleBadgeColor(user.role)}`}>
+                             {getRoleDisplayName(user.role)}
+                           </span>
+                         </div>
+                         <div className="pl-4 space-y-2 pb-2">
+                           <Link 
+                             href="/admin-users" 
+                             className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
+                             onClick={handleLinkClick}
+                           >
+                             {user.role === 'admin' ? 'User Management' : 'Wallet Operations'}
+                           </Link>
+                           
+                           {/* Only show for full admins */}
+                           {user.role === 'admin' && (
+                             <>
+                               <Link 
+                                 href="/admin-orders" 
+                                 className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
+                                 onClick={handleLinkClick}
+                               >
+                                 All Transactions
+                               </Link>
+                               <Link 
+                                 href="/admin-rules" 
+                                 className="block px-4 py-2 text-white hover:bg-gray-800 rounded-md transition-colors"
+                                 onClick={handleLinkClick}
+                               >
+                                 Rules & Settings
+                               </Link>
+                             </>
+                           )}
+                           
+                           {/* Show role-specific descriptions */}
+                           <div className="px-4 py-2 text-gray-400 text-xs">
+                             {user.role === 'credit_admin' && 'You can credit user wallets'}
+                             {user.role === 'debit_admin' && 'You can debit user wallets'}
+                             {user.role === 'admin' && 'Full administrative access'}
+                           </div>
+                         </div>
+                       </div>
                      )}
 
+                     {/* Enhanced user info section with role display */}
                      {balance && (
                        <div className="px-4 py-2 text-white bg-gray-900 rounded-md">
-                         <span className="font-medium text-gray-400">Username:</span> 
-                         <span className="ml-2">{user.username}</span>
-                         <div className="mt-1">
-                           <span className="font-medium text-gray-400">Balance:</span> 
-                           <span className="ml-2">{balance.balance.toFixed(2)} {balance.currency}</span>
+                         <div className="space-y-2">
+                           <div>
+                             <span className="font-medium text-gray-400">Username:</span> 
+                             <span className="ml-2">{user.username}</span>
+                           </div>
+                           <div>
+                             <span className="font-medium text-gray-400">Role:</span> 
+                             <span className={`ml-2 px-2 py-1 text-xs rounded-full text-white ${getRoleBadgeColor(user.role)}`}>
+                               {getRoleDisplayName(user.role)}
+                             </span>
+                           </div>
+                           <div>
+                             <span className="font-medium text-gray-400">Balance:</span> 
+                             <span className="ml-2">{balance.balance.toFixed(2)} {balance.currency}</span>
+                           </div>
                          </div>
                        </div>
                      )}
