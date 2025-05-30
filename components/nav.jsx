@@ -449,31 +449,73 @@ const Navigation = () => {
 
                {/* Mobile Menu Content */}
                <div className="px-6 py-8 space-y-6">
-                 {/* User Info Section - Enhanced */}
+                 {/* User Info Section - Enhanced and Clickable */}
                  {user && (
-                   <div className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-xl p-6 border border-gray-600 shadow-lg">
-                     <div className="flex items-start justify-between mb-4">
-                       <div className="flex-1">
-                         <h3 className="text-white font-semibold text-lg">{user.username}</h3>
-                         <div className="flex items-center mt-2">
-                           <span className={`px-3 py-1 text-xs rounded-full text-white font-semibold ${getRoleBadgeColor(user.role)}`}>
-                             {getRoleDisplayName(user.role)}
-                           </span>
+                   <div className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-xl border border-gray-600 shadow-lg overflow-hidden">
+                     {/* Clickable User Info Area */}
+                     {isAdmin(user.role) ? (
+                       <Link 
+                         href={getAdminNavigation(user.role).mainLink}
+                         className="block p-6 hover:bg-gray-700 transition-colors duration-200"
+                         onClick={handleLinkClick}
+                       >
+                         <div className="flex items-start justify-between mb-4">
+                           <div className="flex-1">
+                             <h3 className="text-white font-semibold text-lg">{user.username}</h3>
+                             <div className="flex items-center mt-2">
+                               <span className={`px-3 py-1 text-xs rounded-full text-white font-semibold ${getRoleBadgeColor(user.role)}`}>
+                                 {getRoleDisplayName(user.role)}
+                               </span>
+                             </div>
+                           </div>
+                           {balance && (
+                             <div className="text-right">
+                               <div className="text-gray-400 text-sm">Balance</div>
+                               <div className="text-green-400 font-bold text-lg">
+                                 {balance.balance.toFixed(2)} {balance.currency}
+                               </div>
+                             </div>
+                           )}
                          </div>
-                       </div>
-                       {balance && (
-                         <div className="text-right">
-                           <div className="text-gray-400 text-sm">Balance</div>
-                           <div className="text-green-400 font-bold text-lg">
-                             {balance.balance.toFixed(2)} {balance.currency}
+                         {/* Role-specific description with navigation hint */}
+                         <div className="flex items-center justify-between">
+                           <div className="text-gray-300 text-sm">
+                             {getAdminNavigation(user.role).description}
+                           </div>
+                           <div className="flex items-center text-blue-400 text-xs">
+                             <span className="mr-1">Tap to access</span>
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                             </svg>
                            </div>
                          </div>
-                       )}
-                     </div>
-                     {/* Role-specific description */}
-                     <div className="text-gray-300 text-sm">
-                       {getAdminNavigation(user.role).description}
-                     </div>
+                       </Link>
+                     ) : (
+                       <div className="p-6">
+                         <div className="flex items-start justify-between mb-4">
+                           <div className="flex-1">
+                             <h3 className="text-white font-semibold text-lg">{user.username}</h3>
+                             <div className="flex items-center mt-2">
+                               <span className={`px-3 py-1 text-xs rounded-full text-white font-semibold ${getRoleBadgeColor(user.role)}`}>
+                                 {getRoleDisplayName(user.role)}
+                               </span>
+                             </div>
+                           </div>
+                           {balance && (
+                             <div className="text-right">
+                               <div className="text-gray-400 text-sm">Balance</div>
+                               <div className="text-green-400 font-bold text-lg">
+                                 {balance.balance.toFixed(2)} {balance.currency}
+                               </div>
+                             </div>
+                           )}
+                         </div>
+                         {/* Regular user description */}
+                         <div className="text-gray-300 text-sm">
+                           Regular user account
+                         </div>
+                       </div>
+                     )}
                    </div>
                  )}
 
