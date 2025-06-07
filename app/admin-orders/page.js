@@ -26,29 +26,92 @@ export default function OrdersManagement() {
   const [itemsPerPage] = useState(20);
   const [senderID, setSenderID] = useState('EL VENDER');
   
-  // New state for capacity exclusion
+  // State for capacity exclusion
   const [excludedCapacities, setExcludedCapacities] = useState([]);
   const [showCapacityFilter, setShowCapacityFilter] = useState(false);
   const [availableCapacities, setAvailableCapacities] = useState([]);
+  
+  // New state for network exclusion
+  const [excludedNetworks, setExcludedNetworks] = useState([]);
+  const [showNetworkFilter, setShowNetworkFilter] = useState(false);
+  const [availableNetworks, setAvailableNetworks] = useState([]);
+  
+  // New state for combined network-capacity exclusion
+  const [excludedNetworkCapacities, setExcludedNetworkCapacities] = useState([]);
+  const [showNetworkCapacityFilter, setShowNetworkCapacityFilter] = useState(false);
+  const [availableNetworkCapacities, setAvailableNetworkCapacities] = useState([]);
+
+  // Helper function to extract network from bundle type
+  const getNetworkFromBundleType = (bundleType) => {
+    if (!bundleType) return 'Unknown';
+    
+    const networkMap = {
+      'mtnup2u': 'MTN',
+      'mtn-justforu': 'MTN',
+      'AT-ishare': 'AirtelTigo',
+      'Telecel-5959': 'Telecel',
+      'AfA-registration': 'AfA'
+    };
+    
+    return networkMap[bundleType] || 'Unknown';
+  };
 
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  // Calculate available capacities whenever orders change
+  // Define the standard capacities
+  const STANDARD_CAPACITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100];
+  
+  // Calculate available capacities, networks, and network-capacity combinations
   useEffect(() => {
     if (orders.length > 0) {
-      const capacities = [...new Set(orders.map(order => order.capacity).filter(cap => cap !== null && cap !== undefined))]
-        .sort((a, b) => a - b);
+      // Capacities - use only standard capacities that exist in orders
+      const orderCapacities = new Set(orders.map(order => order.capacity).filter(cap => cap !== null && cap !== undefined));
+      const capacities = STANDARD_CAPACITIES.filter(cap => orderCapacities.has(cap));
       setAvailableCapacities(capacities);
+      
+      // Networks
+      const networks = [...new Set(orders.map(order => getNetworkFromBundleType(order.bundleType)))]
+        .filter(network => network !== 'Unknown')
+        .sort();
+      setAvailableNetworks(networks);
+      
+      // Network-Capacity combinations - show all standard capacities for each network
+      const networkCapacityCombos = [];
+      const existingCombos = new Set();
+      
+      // First, collect what actually exists in orders
+      orders.forEach(order => {
+        const network = getNetworkFromBundleType(order.bundleType);
+        if (network !== 'Unknown' && order.capacity !== null && order.capacity !== undefined) {
+          existingCombos.add(`${network}-${order.capacity}`);
+        }
+      });
+      
+      // Then create combinations for all networks with standard capacities
+      networks.forEach(network => {
+        STANDARD_CAPACITIES.forEach(capacity => {
+          // Only include if this combination exists in the orders
+          if (existingCombos.has(`${network}-${capacity}`)) {
+            networkCapacityCombos.push({
+              network,
+              capacity,
+              combo: `${network}-${capacity}GB`
+            });
+          }
+        });
+      });
+      
+      setAvailableNetworkCapacities(networkCapacityCombos);
     }
   }, [orders]);
 
   // Apply filters whenever dependencies change
   useEffect(() => {
     applyFilters();
-  }, [filter, orders, searchQuery, excludedCapacities]);
+  }, [filter, orders, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
 
   // Update displayed orders based on pagination
   useEffect(() => {
@@ -60,7 +123,6 @@ export default function OrdersManagement() {
       setLoading(true);
       setError(null);
       
-      // Fetch with a higher limit to ensure we get ALL orders
       const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000000`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
@@ -71,19 +133,6 @@ export default function OrdersManagement() {
         const allOrders = response.data.data || [];
         setOrders(allOrders);
         console.log(`Fetched ${allOrders.length} total orders`);
-        
-        // Log sample of orders for debugging
-        if (allOrders.length > 0) {
-          console.log('Sample orders for debugging:', allOrders.slice(0, 3).map(order => ({
-            _id: order._id,
-            orderReference: order.orderReference,
-            recipientNumber: order.recipientNumber,
-            phoneNumber: order.phoneNumber,
-            bundleType: order.bundleType,
-            status: order.status,
-            user: order.user
-          })));
-        }
       } else {
         setOrders([]);
         setFilteredOrders([]);
@@ -102,18 +151,16 @@ export default function OrdersManagement() {
   };
 
   const applyFilters = () => {
-    console.log('Applying filters...', { filter, searchQuery, excludedCapacities });
+    console.log('Applying filters...', { filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities });
     console.log('Total orders available:', orders.length);
     
     let result = [...orders];
     
-    // Apply search filter ACROSS ALL ORDERS
+    // Apply search filter
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
-      console.log('Searching for:', query);
       
       result = result.filter(order => {
-        // Expanded search fields - check ALL possible fields
         const searchFields = [
           order._id,
           order.orderReference,
@@ -123,12 +170,11 @@ export default function OrdersManagement() {
           order.recipientNumber,
           order.metadata?.fullName,
           order.phoneNumber,
-          order.user?._id, // User ID
+          order.user?._id,
           order.bundleType,
           order.status,
           order.capacity?.toString(),
           order.price?.toString(),
-          // Also check if the phone number is stored with or without country code
           order.recipientNumber?.replace(/^\+233/, '0'),
           order.recipientNumber?.replace(/^233/, '0'),
           order.phoneNumber?.replace(/^\+233/, '0'),
@@ -137,49 +183,28 @@ export default function OrdersManagement() {
           order.user?.phone?.replace(/^233/, '0'),
         ];
         
-        // Debug log for first few orders
-        if (orders.indexOf(order) < 3) {
-          console.log('Sample order fields:', {
-            _id: order._id,
-            orderReference: order.orderReference,
-            recipientNumber: order.recipientNumber,
-            phoneNumber: order.phoneNumber,
-            userPhone: order.user?.phone,
-            username: order.user?.username
-          });
-        }
-        
         const matches = searchFields.some(field => {
           if (!field) return false;
           const fieldStr = field.toString().toLowerCase();
           
-          // Check for exact match or partial match
           return fieldStr.includes(query) || 
-                 // Also check if query matches without leading zeros
                  (query.startsWith('0') && fieldStr.includes(query.substring(1))) ||
-                 // Check if query matches with different country code formats
                  (query.startsWith('233') && fieldStr.includes('0' + query.substring(3))) ||
                  (query.startsWith('+233') && fieldStr.includes('0' + query.substring(4)));
         });
         
         return matches;
       });
-      
-      console.log(`Search results for "${query}":`, result.length);
-      if (result.length > 0) {
-        console.log('First matching order:', result[0]);
-      }
     }
     
-    // Apply other filters only if no search query or if we want to combine search with filters
+    // Apply status filter
     if (filter.status && filter.status !== '') {
       result = result.filter(order => order.status === filter.status);
-      console.log(`After status filter (${filter.status}):`, result.length);
     }
     
+    // Apply bundle type filter
     if (filter.bundleType && filter.bundleType !== '') {
       result = result.filter(order => order.bundleType === filter.bundleType);
-      console.log(`After bundleType filter (${filter.bundleType}):`, result.length);
     }
     
     // Apply date range filters
@@ -190,7 +215,6 @@ export default function OrdersManagement() {
         const orderDate = new Date(order.createdAt);
         return orderDate >= startDate;
       });
-      console.log(`After startDate filter (${filter.startDate}):`, result.length);
     }
     
     if (filter.endDate) {
@@ -200,13 +224,28 @@ export default function OrdersManagement() {
         const orderDate = new Date(order.createdAt);
         return orderDate <= endDate;
       });
-      console.log(`After endDate filter (${filter.endDate}):`, result.length);
     }
     
     // Apply capacity exclusion filter
     if (excludedCapacities.length > 0) {
       result = result.filter(order => !excludedCapacities.includes(order.capacity));
-      console.log(`After capacity exclusion filter:`, result.length);
+    }
+    
+    // Apply network exclusion filter
+    if (excludedNetworks.length > 0) {
+      result = result.filter(order => {
+        const network = getNetworkFromBundleType(order.bundleType);
+        return !excludedNetworks.includes(network);
+      });
+    }
+    
+    // Apply network-capacity combination exclusion
+    if (excludedNetworkCapacities.length > 0) {
+      result = result.filter(order => {
+        const network = getNetworkFromBundleType(order.bundleType);
+        const combo = `${network}-${order.capacity}GB`;
+        return !excludedNetworkCapacities.includes(combo);
+      });
     }
     
     // Update filtered orders and pagination
@@ -224,8 +263,6 @@ export default function OrdersManagement() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedResult = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
     setDisplayedOrders(paginatedResult);
-    
-    console.log(`Page ${currentPage}: Showing ${paginatedResult.length} orders`);
   };
 
   const handleSearchChange = (e) => {
@@ -237,7 +274,6 @@ export default function OrdersManagement() {
   };
 
   const clearFilters = () => {
-    // Clear only filters, not search
     setFilter({
       status: '',
       bundleType: '',
@@ -245,6 +281,8 @@ export default function OrdersManagement() {
       endDate: ''
     });
     setExcludedCapacities([]);
+    setExcludedNetworks([]);
+    setExcludedNetworkCapacities([]);
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
@@ -262,7 +300,6 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
-        // Update all order states
         const updatedOrders = orders.map(order => 
           order._id === orderId ? { ...order, status: newStatus } : order
         );
@@ -301,13 +338,11 @@ export default function OrdersManagement() {
       
       await Promise.all(updatePromises);
       
-      // Update all order states
       const updatedOrders = orders.map(order => 
         selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
       );
       setOrders(updatedOrders);
       
-      // Clear selections
       setSelectedOrders([]);
       setBulkStatus('');
     } catch (err) {
@@ -337,13 +372,27 @@ export default function OrdersManagement() {
   };
 
   const handleSelectAllFiltered = () => {
-    if (selectedOrders.length === filteredOrders.length) {
+    // Get orders after applying all exclusions
+    const ordersToSelect = filteredOrders
+      .filter(order => {
+        // Check capacity exclusion
+        if (excludedCapacities.includes(order.capacity)) return false;
+        
+        // Check network exclusion
+        const network = getNetworkFromBundleType(order.bundleType);
+        if (excludedNetworks.includes(network)) return false;
+        
+        // Check network-capacity combination exclusion
+        const combo = `${network}-${order.capacity}GB`;
+        if (excludedNetworkCapacities.includes(combo)) return false;
+        
+        return true;
+      })
+      .map(order => order._id);
+    
+    if (selectedOrders.length === ordersToSelect.length) {
       setSelectedOrders([]);
     } else {
-      // Apply capacity exclusion when selecting all
-      const ordersToSelect = filteredOrders
-        .filter(order => !excludedCapacities.includes(order.capacity))
-        .map(order => order._id);
       setSelectedOrders(ordersToSelect);
     }
   };
@@ -367,6 +416,8 @@ export default function OrdersManagement() {
     });
     setSearchQuery('');
     setExcludedCapacities([]);
+    setExcludedNetworks([]);
+    setExcludedNetworkCapacities([]);
   };
 
   const formatDate = (dateString) => {
@@ -401,6 +452,26 @@ export default function OrdersManagement() {
     });
   };
 
+  const toggleNetworkExclusion = (network) => {
+    setExcludedNetworks(prev => {
+      if (prev.includes(network)) {
+        return prev.filter(n => n !== network);
+      } else {
+        return [...prev, network];
+      }
+    });
+  };
+
+  const toggleNetworkCapacityExclusion = (combo) => {
+    setExcludedNetworkCapacities(prev => {
+      if (prev.includes(combo)) {
+        return prev.filter(c => c !== combo);
+      } else {
+        return [...prev, combo];
+      }
+    });
+  };
+
   const exportToExcel = async () => {
     try {
       const ordersToExport = selectedOrders.length > 0 
@@ -410,6 +481,8 @@ export default function OrdersManagement() {
       const excelData = ordersToExport.map(order => ({
         'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
         'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
+        'Network': getNetworkFromBundleType(order.bundleType),
+        'Bundle Type': order.bundleType || 'N/A'
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -420,6 +493,8 @@ export default function OrdersManagement() {
       const wscols = [
         { wch: maxWidth },
         { wch: 12 },
+        { wch: 15 },
+        { wch: 20 }
       ];
       worksheet['!cols'] = wscols;
       
@@ -487,7 +562,14 @@ export default function OrdersManagement() {
                   onClick={handleSelectAllFiltered}
                   className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  {selectedOrders.length === filteredOrders.filter(order => !excludedCapacities.includes(order.capacity)).length 
+                  {selectedOrders.length === filteredOrders.filter(order => {
+                    if (excludedCapacities.includes(order.capacity)) return false;
+                    const network = getNetworkFromBundleType(order.bundleType);
+                    if (excludedNetworks.includes(network)) return false;
+                    const combo = `${network}-${order.capacity}GB`;
+                    if (excludedNetworkCapacities.includes(combo)) return false;
+                    return true;
+                  }).length 
                     ? "Deselect All Filtered" 
                     : "Select All Filtered Orders"}
                 </button>
@@ -545,7 +627,7 @@ export default function OrdersManagement() {
           )}
         </div>
 
-        {/* Filter Form with Capacity Exclusion */}
+        {/* Filter Form with Exclusion Buttons */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
           <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -636,34 +718,127 @@ export default function OrdersManagement() {
               >
                 {showCapacityFilter ? 'Hide' : 'Show'} Capacity Filter ({excludedCapacities.length} excluded)
               </button>
+              <button
+                type="button"
+                onClick={() => setShowNetworkFilter(!showNetworkFilter)}
+                className="inline-flex justify-center py-2 px-4 border border-purple-300 dark:border-purple-600 shadow-sm text-sm font-medium rounded-md text-purple-700 dark:text-purple-200 bg-purple-50 dark:bg-purple-900 hover:bg-purple-100 dark:hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                {showNetworkFilter ? 'Hide' : 'Show'} Network Filter ({excludedNetworks.length} excluded)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNetworkCapacityFilter(!showNetworkCapacityFilter)}
+                className="inline-flex justify-center py-2 px-4 border border-orange-300 dark:border-orange-600 shadow-sm text-sm font-medium rounded-md text-orange-700 dark:text-orange-200 bg-orange-50 dark:bg-orange-900 hover:bg-orange-100 dark:hover:bg-orange-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+              >
+                {showNetworkCapacityFilter ? 'Hide' : 'Show'} Network+Capacity Filter ({excludedNetworkCapacities.length} excluded)
+              </button>
             </div>
           </form>
           
           {/* Capacity Exclusion Filter */}
           {showCapacityFilter && availableCapacities.length > 0 && (
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
                 Exclude Capacities from Selection:
               </h4>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-10 gap-2">
                 {availableCapacities.map(capacity => (
                   <button
                     key={capacity}
                     onClick={() => toggleCapacityExclusion(capacity)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors text-center ${
                       excludedCapacities.includes(capacity)
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
                     }`}
                   >
-                    {capacity} GB {excludedCapacities.includes(capacity) && '✕'}
+                    {capacity}GB
                   </button>
                 ))}
               </div>
               {excludedCapacities.length > 0 && (
+                <div className="mt-3 p-2 bg-red-100 dark:bg-red-900/40 rounded">
+                  <p className="text-xs font-medium text-red-800 dark:text-red-200">
+                    Excluded capacities ({excludedCapacities.length}): {excludedCapacities.sort((a, b) => a - b).join(', ')} GB
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Network Exclusion Filter */}
+          {showNetworkFilter && availableNetworks.length > 0 && (
+            <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-md">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                Exclude Networks from Selection:
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {availableNetworks.map(network => (
+                  <button
+                    key={network}
+                    onClick={() => toggleNetworkExclusion(network)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      excludedNetworks.includes(network)
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
+                    }`}
+                  >
+                    {network} {excludedNetworks.includes(network) && '✕'}
+                  </button>
+                ))}
+              </div>
+              {excludedNetworks.length > 0 && (
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  Orders with {excludedCapacities.join(', ')} GB capacity will be excluded from bulk selection
+                  Orders from {excludedNetworks.join(', ')} will be excluded from bulk selection
                 </p>
+              )}
+            </div>
+          )}
+          
+          {/* Network-Capacity Combination Exclusion Filter */}
+          {showNetworkCapacityFilter && availableNetworkCapacities.length > 0 && (
+            <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-md">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
+                Exclude Specific Network-Capacity Combinations:
+              </h4>
+              <div className="space-y-3">
+                {['MTN', 'AirtelTigo', 'Telecel', 'AfA'].map(network => {
+                  const networkCombos = availableNetworkCapacities.filter(item => item.network === network);
+                  if (networkCombos.length === 0) return null;
+                  
+                  return (
+                    <div key={network} className="border-b border-gray-200 dark:border-gray-700 pb-3 last:border-0">
+                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                        {network} Capacities:
+                      </p>
+                      <div className="grid grid-cols-10 gap-1.5">
+                        {networkCombos.sort((a, b) => a.capacity - b.capacity).map(item => (
+                          <button
+                            key={item.combo}
+                            onClick={() => toggleNetworkCapacityExclusion(item.combo)}
+                            className={`px-2 py-1 rounded text-xs font-medium transition-colors text-center ${
+                              excludedNetworkCapacities.includes(item.combo)
+                                ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
+                            }`}
+                          >
+                            {item.capacity}GB
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {excludedNetworkCapacities.length > 0 && (
+                <div className="mt-3 p-2 bg-orange-100 dark:bg-orange-900/40 rounded">
+                  <p className="text-xs font-medium text-orange-800 dark:text-orange-200 mb-1">
+                    Excluded Combinations ({excludedNetworkCapacities.length}):
+                  </p>
+                  <p className="text-xs text-orange-700 dark:text-orange-300">
+                    {excludedNetworkCapacities.join(', ')}
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -678,6 +853,12 @@ export default function OrdersManagement() {
           <div>SMS Sender ID: <span className="font-semibold">{senderID}</span></div>
           {excludedCapacities.length > 0 && (
             <div>Excluded Capacities: <span className="font-semibold">{excludedCapacities.join(', ')} GB</span></div>
+          )}
+          {excludedNetworks.length > 0 && (
+            <div>Excluded Networks: <span className="font-semibold">{excludedNetworks.join(', ')}</span></div>
+          )}
+          {excludedNetworkCapacities.length > 0 && (
+            <div>Excluded Combos: <span className="font-semibold">{excludedNetworkCapacities.length} items</span></div>
           )}
           {searchQuery && (
             <div className="text-blue-600 dark:text-blue-400 font-semibold">
@@ -714,6 +895,7 @@ export default function OrdersManagement() {
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Network</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Bundle Type</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recipient</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Capacity</th>
@@ -753,6 +935,11 @@ export default function OrdersManagement() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700">
+                                {getNetworkFromBundleType(order.bundleType)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               {order.bundleType}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -773,6 +960,16 @@ export default function OrdersManagement() {
                               <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                getNetworkFromBundleType(order.bundleType) === 'MTN' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
+                                getNetworkFromBundleType(order.bundleType) === 'AirtelTigo' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
+                                getNetworkFromBundleType(order.bundleType) === 'Telecel' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                              }`}>
+                                {getNetworkFromBundleType(order.bundleType)}
+                              </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               {order.bundleType}
@@ -818,8 +1015,8 @@ export default function OrdersManagement() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery || Object.values(filter).some(v => v !== '') || excludedCapacities.length > 0
+                      <td colSpan="11" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                        {searchQuery || Object.values(filter).some(v => v !== '') || excludedCapacities.length > 0 || excludedNetworks.length > 0 || excludedNetworkCapacities.length > 0
                           ? "No orders found matching your search/filters" 
                           : "No orders found"}
                       </td>
@@ -842,9 +1039,9 @@ export default function OrdersManagement() {
                     {Math.min(currentPage * itemsPerPage, filteredOrders.length)}
                   </span> of{' '}
                   <span className="font-medium">{filteredOrders.length}</span> orders
-                  {excludedCapacities.length > 0 && (
+                  {(excludedCapacities.length > 0 || excludedNetworks.length > 0 || excludedNetworkCapacities.length > 0) && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      (excluding {excludedCapacities.join(', ')} GB)
+                      (with exclusions applied)
                     </span>
                   )}
                   {searchQuery && (
