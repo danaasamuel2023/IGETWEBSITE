@@ -24,21 +24,33 @@ export default function OrdersManagement() {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
   const [itemsPerPage] = useState(20);
-  const [senderID, setSenderID] = useState('EL VENDER'); // New state for sender ID
+  const [senderID, setSenderID] = useState('EL VENDER');
+  
+  // New state for capacity exclusion
+  const [excludedCapacities, setExcludedCapacities] = useState([]);
+  const [showCapacityFilter, setShowCapacityFilter] = useState(false);
+  const [availableCapacities, setAvailableCapacities] = useState([]);
 
   // Fetch orders on component mount
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  // First, apply filters to get filtered orders list
+  // Calculate available capacities whenever orders change
   useEffect(() => {
     if (orders.length > 0) {
-      applyFilters();
+      const capacities = [...new Set(orders.map(order => order.capacity).filter(cap => cap !== null && cap !== undefined))]
+        .sort((a, b) => a - b);
+      setAvailableCapacities(capacities);
     }
-  }, [filter, orders, searchQuery]);
+  }, [orders]);
 
-  // Then, update the displayed orders based on pagination
+  // Apply filters whenever dependencies change
+  useEffect(() => {
+    applyFilters();
+  }, [filter, orders, searchQuery, excludedCapacities]);
+
+  // Update displayed orders based on pagination
   useEffect(() => {
     updateDisplayedOrders();
   }, [filteredOrders, currentPage, itemsPerPage]);
@@ -48,20 +60,30 @@ export default function OrdersManagement() {
       setLoading(true);
       setError(null);
       
-      // Fetch all orders without pagination for client-side filtering
-      const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000`, {
+      // Fetch with a higher limit to ensure we get ALL orders
+      const response = await axios.get(`https://iget.onrender.com/api/orders/all?limit=1000000`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
       });
       
       if (response.data && response.data.success) {
-        // Store all orders
         const allOrders = response.data.data || [];
         setOrders(allOrders);
-        
-        // Initial filtering will be applied by the useEffect
         console.log(`Fetched ${allOrders.length} total orders`);
+        
+        // Log sample of orders for debugging
+        if (allOrders.length > 0) {
+          console.log('Sample orders for debugging:', allOrders.slice(0, 3).map(order => ({
+            _id: order._id,
+            orderReference: order.orderReference,
+            recipientNumber: order.recipientNumber,
+            phoneNumber: order.phoneNumber,
+            bundleType: order.bundleType,
+            status: order.status,
+            user: order.user
+          })));
+        }
       } else {
         setOrders([]);
         setFilteredOrders([]);
@@ -80,36 +102,84 @@ export default function OrdersManagement() {
   };
 
   const applyFilters = () => {
-    // Start with all orders
+    console.log('Applying filters...', { filter, searchQuery, excludedCapacities });
+    console.log('Total orders available:', orders.length);
+    
     let result = [...orders];
     
-    // Apply search filter first
+    // Apply search filter ACROSS ALL ORDERS
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
-      result = result.filter(order => 
-        // Search by order ID or reference
-        (order._id && order._id.toLowerCase().includes(query)) ||
-        (order.orderReference && order.orderReference.toLowerCase().includes(query)) ||
-        // Search by user information
-        (order.user?.username && order.user.username.toLowerCase().includes(query)) ||
-        (order.user?.email && order.user.email.toLowerCase().includes(query)) ||
-        (order.user?.phone && order.user.phone.toLowerCase().includes(query)) ||
-        // Search by recipient number
-        (order.recipientNumber && order.recipientNumber.toLowerCase().includes(query)) ||
-        // Search by AfA registration metadata
-        (order.metadata?.fullName && order.metadata.fullName.toLowerCase().includes(query)) ||
-        (order.phoneNumber && order.phoneNumber.toLowerCase().includes(query))
-      );
+      console.log('Searching for:', query);
+      
+      result = result.filter(order => {
+        // Expanded search fields - check ALL possible fields
+        const searchFields = [
+          order._id,
+          order.orderReference,
+          order.user?.username,
+          order.user?.email,
+          order.user?.phone,
+          order.recipientNumber,
+          order.metadata?.fullName,
+          order.phoneNumber,
+          order.user?._id, // User ID
+          order.bundleType,
+          order.status,
+          order.capacity?.toString(),
+          order.price?.toString(),
+          // Also check if the phone number is stored with or without country code
+          order.recipientNumber?.replace(/^\+233/, '0'),
+          order.recipientNumber?.replace(/^233/, '0'),
+          order.phoneNumber?.replace(/^\+233/, '0'),
+          order.phoneNumber?.replace(/^233/, '0'),
+          order.user?.phone?.replace(/^\+233/, '0'),
+          order.user?.phone?.replace(/^233/, '0'),
+        ];
+        
+        // Debug log for first few orders
+        if (orders.indexOf(order) < 3) {
+          console.log('Sample order fields:', {
+            _id: order._id,
+            orderReference: order.orderReference,
+            recipientNumber: order.recipientNumber,
+            phoneNumber: order.phoneNumber,
+            userPhone: order.user?.phone,
+            username: order.user?.username
+          });
+        }
+        
+        const matches = searchFields.some(field => {
+          if (!field) return false;
+          const fieldStr = field.toString().toLowerCase();
+          
+          // Check for exact match or partial match
+          return fieldStr.includes(query) || 
+                 // Also check if query matches without leading zeros
+                 (query.startsWith('0') && fieldStr.includes(query.substring(1))) ||
+                 // Check if query matches with different country code formats
+                 (query.startsWith('233') && fieldStr.includes('0' + query.substring(3))) ||
+                 (query.startsWith('+233') && fieldStr.includes('0' + query.substring(4)));
+        });
+        
+        return matches;
+      });
+      
+      console.log(`Search results for "${query}":`, result.length);
+      if (result.length > 0) {
+        console.log('First matching order:', result[0]);
+      }
     }
     
-    // Apply status filter
-    if (filter.status) {
+    // Apply other filters only if no search query or if we want to combine search with filters
+    if (filter.status && filter.status !== '') {
       result = result.filter(order => order.status === filter.status);
+      console.log(`After status filter (${filter.status}):`, result.length);
     }
     
-    // Apply bundle type filter
-    if (filter.bundleType) {
+    if (filter.bundleType && filter.bundleType !== '') {
       result = result.filter(order => order.bundleType === filter.bundleType);
+      console.log(`After bundleType filter (${filter.bundleType}):`, result.length);
     }
     
     // Apply date range filters
@@ -120,6 +190,7 @@ export default function OrdersManagement() {
         const orderDate = new Date(order.createdAt);
         return orderDate >= startDate;
       });
+      console.log(`After startDate filter (${filter.startDate}):`, result.length);
     }
     
     if (filter.endDate) {
@@ -129,9 +200,16 @@ export default function OrdersManagement() {
         const orderDate = new Date(order.createdAt);
         return orderDate <= endDate;
       });
+      console.log(`After endDate filter (${filter.endDate}):`, result.length);
     }
     
-    // Update filtered orders and calculate total pages
+    // Apply capacity exclusion filter
+    if (excludedCapacities.length > 0) {
+      result = result.filter(order => !excludedCapacities.includes(order.capacity));
+      console.log(`After capacity exclusion filter:`, result.length);
+    }
+    
+    // Update filtered orders and pagination
     setFilteredOrders(result);
     const total = Math.ceil(result.length / itemsPerPage);
     setTotalPages(total > 0 ? total : 1);
@@ -139,16 +217,15 @@ export default function OrdersManagement() {
     // Reset to first page when filters change
     setCurrentPage(1);
     
-    console.log(`Applied filters: ${result.length} orders match the criteria`);
+    console.log(`Final filtered result: ${result.length} orders`);
   };
 
   const updateDisplayedOrders = () => {
-    // Apply pagination to filtered orders
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedResult = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
     setDisplayedOrders(paginatedResult);
     
-    console.log(`Page ${currentPage}: Showing ${paginatedResult.length} orders (${startIndex + 1}-${startIndex + paginatedResult.length} of ${filteredOrders.length})`);
+    console.log(`Page ${currentPage}: Showing ${paginatedResult.length} orders`);
   };
 
   const handleSearchChange = (e) => {
@@ -159,7 +236,17 @@ export default function OrdersManagement() {
     setSearchQuery('');
   };
 
-  // Updated to include senderID
+  const clearFilters = () => {
+    // Clear only filters, not search
+    setFilter({
+      status: '',
+      bundleType: '',
+      startDate: '',
+      endDate: ''
+    });
+    setExcludedCapacities([]);
+  };
+
   const handleStatusChange = async (orderId, newStatus) => {
     try {
       setLoading(true);
@@ -167,7 +254,7 @@ export default function OrdersManagement() {
       
       const response = await axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
         status: newStatus,
-        senderID: senderID // Include senderID in the request
+        senderID: senderID
       }, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
@@ -175,22 +262,11 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
-        // Update the order in all orders array
+        // Update all order states
         const updatedOrders = orders.map(order => 
           order._id === orderId ? { ...order, status: newStatus } : order
         );
         setOrders(updatedOrders);
-        
-        // Re-apply filters to update filtered and displayed orders
-        const updatedFiltered = filteredOrders.map(order => 
-          order._id === orderId ? { ...order, status: newStatus } : order
-        );
-        setFilteredOrders(updatedFiltered);
-        
-        const updatedDisplayed = displayedOrders.map(order => 
-          order._id === orderId ? { ...order, status: newStatus } : order
-        );
-        setDisplayedOrders(updatedDisplayed);
       } else {
         setError('Failed to update order status');
       }
@@ -202,7 +278,6 @@ export default function OrdersManagement() {
     }
   };
 
-  // Updated to include senderID
   const handleBulkStatusChange = async (newStatus) => {
     if (!newStatus || selectedOrders.length === 0) {
       setError('Please select at least one order and a status to update');
@@ -216,7 +291,7 @@ export default function OrdersManagement() {
       const updatePromises = selectedOrders.map(orderId => 
         axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
           status: newStatus,
-          senderID: senderID // Include senderID in the request
+          senderID: senderID
         }, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('igettoken')}`
@@ -226,23 +301,13 @@ export default function OrdersManagement() {
       
       await Promise.all(updatePromises);
       
-      // Update orders in all states
+      // Update all order states
       const updatedOrders = orders.map(order => 
         selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
       );
       setOrders(updatedOrders);
       
-      const updatedFiltered = filteredOrders.map(order => 
-        selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
-      );
-      setFilteredOrders(updatedFiltered);
-      
-      const updatedDisplayed = displayedOrders.map(order => 
-        selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
-      );
-      setDisplayedOrders(updatedDisplayed);
-      
-      // Clear selected orders
+      // Clear selections
       setSelectedOrders([]);
       setBulkStatus('');
     } catch (err) {
@@ -275,7 +340,11 @@ export default function OrdersManagement() {
     if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
-      setSelectedOrders(filteredOrders.map(order => order._id));
+      // Apply capacity exclusion when selecting all
+      const ordersToSelect = filteredOrders
+        .filter(order => !excludedCapacities.includes(order.capacity))
+        .map(order => order._id);
+      setSelectedOrders(ordersToSelect);
     }
   };
 
@@ -286,11 +355,10 @@ export default function OrdersManagement() {
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    // Manually trigger filter application
     applyFilters();
   };
 
-  const resetFilters = () => {
+  const resetAll = () => {
     setFilter({
       status: '',
       bundleType: '',
@@ -298,6 +366,7 @@ export default function OrdersManagement() {
       endDate: ''
     });
     setSearchQuery('');
+    setExcludedCapacities([]);
   };
 
   const formatDate = (dateString) => {
@@ -322,14 +391,22 @@ export default function OrdersManagement() {
     }
   };
 
+  const toggleCapacityExclusion = (capacity) => {
+    setExcludedCapacities(prev => {
+      if (prev.includes(capacity)) {
+        return prev.filter(c => c !== capacity);
+      } else {
+        return [...prev, capacity];
+      }
+    });
+  };
+
   const exportToExcel = async () => {
     try {
-      // Determine which orders to export - selected orders if any are selected, otherwise all filtered orders
       const ordersToExport = selectedOrders.length > 0 
         ? orders.filter(order => selectedOrders.includes(order._id))
         : filteredOrders;
       
-      // Create a simpler Excel structure focusing on number and capacity
       const excelData = ordersToExport.map(order => ({
         'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
         'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
@@ -339,11 +416,10 @@ export default function OrdersManagement() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
       
-      // Auto-size columns
       const maxWidth = excelData.reduce((w, r) => Math.max(w, r['Recipient Number'].length), 10);
       const wscols = [
-        { wch: maxWidth }, // Recipient Number 
-        { wch: 12 },       // Capacity
+        { wch: maxWidth },
+        { wch: 12 },
       ];
       worksheet['!cols'] = wscols;
       
@@ -369,7 +445,6 @@ export default function OrdersManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
           <div className="flex flex-wrap gap-2 items-center">
-            {/* New Sender ID input field */}
             <div className="flex items-center space-x-2">
               <label htmlFor="senderID" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 SMS Sender ID:
@@ -412,7 +487,7 @@ export default function OrdersManagement() {
                   onClick={handleSelectAllFiltered}
                   className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  {selectedOrders.length === filteredOrders.length 
+                  {selectedOrders.length === filteredOrders.filter(order => !excludedCapacities.includes(order.capacity)).length 
                     ? "Deselect All Filtered" 
                     : "Select All Filtered Orders"}
                 </button>
@@ -440,7 +515,7 @@ export default function OrdersManagement() {
             </div>
             <input
               type="text"
-              placeholder="Search by ID, username, email, phone or recipient number..."
+              placeholder="Search by ID, username, email, phone, recipient number, or order reference..."
               className="pl-10 pr-10 py-2 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
               value={searchQuery}
               onChange={handleSearchChange}
@@ -458,9 +533,19 @@ export default function OrdersManagement() {
               </div>
             )}
           </div>
+          {searchQuery && (
+            <div className="mt-2 space-y-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Searching across all {orders.length} orders...
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500">
+                Tip: Try searching with different formats (e.g., with/without country code: 0241234567 or 233241234567)
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Filter Form */}
+        {/* Filter Form with Capacity Exclusion */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
           <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -532,24 +617,72 @@ export default function OrdersManagement() {
               </button>
               <button
                 type="button"
-                onClick={resetFilters}
+                onClick={clearFilters}
                 className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Reset All Filters
+                Clear Filters
+              </button>
+              <button
+                type="button"
+                onClick={resetAll}
+                className="inline-flex justify-center py-2 px-4 border border-red-300 dark:border-red-600 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Reset All (Search & Filters)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCapacityFilter(!showCapacityFilter)}
+                className="inline-flex justify-center py-2 px-4 border border-blue-300 dark:border-blue-600 shadow-sm text-sm font-medium rounded-md text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {showCapacityFilter ? 'Hide' : 'Show'} Capacity Filter ({excludedCapacities.length} excluded)
               </button>
             </div>
           </form>
+          
+          {/* Capacity Exclusion Filter */}
+          {showCapacityFilter && availableCapacities.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+                Exclude Capacities from Selection:
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {availableCapacities.map(capacity => (
+                  <button
+                    key={capacity}
+                    onClick={() => toggleCapacityExclusion(capacity)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      excludedCapacities.includes(capacity)
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
+                    }`}
+                  >
+                    {capacity} GB {excludedCapacities.includes(capacity) && '✕'}
+                  </button>
+                ))}
+              </div>
+              {excludedCapacities.length > 0 && (
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  Orders with {excludedCapacities.join(', ')} GB capacity will be excluded from bulk selection
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Data Stats with Sender ID info */}
+        {/* Data Stats */}
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
           <div>Total Orders: <span className="font-semibold">{orders.length}</span></div>
           <div>Filtered Orders: <span className="font-semibold">{filteredOrders.length}</span></div>
           <div>Current Page: <span className="font-semibold">{currentPage} of {totalPages}</span></div>
           <div>Displayed Orders: <span className="font-semibold">{displayedOrders.length}</span></div>
           <div>SMS Sender ID: <span className="font-semibold">{senderID}</span></div>
+          {excludedCapacities.length > 0 && (
+            <div>Excluded Capacities: <span className="font-semibold">{excludedCapacities.join(', ')} GB</span></div>
+          )}
           {searchQuery && (
-            <div>Search Results: <span className="font-semibold">{filteredOrders.length} matching "{searchQuery}"</span></div>
+            <div className="text-blue-600 dark:text-blue-400 font-semibold">
+              Search Results: {filteredOrders.length} matching "{searchQuery}"
+            </div>
           )}
         </div>
 
@@ -630,7 +763,6 @@ export default function OrdersManagement() {
                                 </div>
                               </div>
                             </td>
-                            {/* Empty capacity cell for AfA registrations */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                               -
                             </td>
@@ -649,7 +781,7 @@ export default function OrdersManagement() {
                               {order.recipientNumber || 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.capacity ? (order.capacity) : 'N/A'} GB
+                              {order.capacity ? order.capacity : 'N/A'} GB
                             </td>
                           </>
                         )}
@@ -666,7 +798,6 @@ export default function OrdersManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {/* Updated to show sender ID will be used */}
                           <div className="flex flex-col space-y-2">
                             <select 
                               className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
@@ -688,8 +819,8 @@ export default function OrdersManagement() {
                   ) : (
                     <tr>
                       <td colSpan="10" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {searchQuery || Object.values(filter).some(v => v !== '') 
-                          ? "No orders found matching your filters" 
+                        {searchQuery || Object.values(filter).some(v => v !== '') || excludedCapacities.length > 0
+                          ? "No orders found matching your search/filters" 
                           : "No orders found"}
                       </td>
                     </tr>
@@ -711,6 +842,16 @@ export default function OrdersManagement() {
                     {Math.min(currentPage * itemsPerPage, filteredOrders.length)}
                   </span> of{' '}
                   <span className="font-medium">{filteredOrders.length}</span> orders
+                  {excludedCapacities.length > 0 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                      (excluding {excludedCapacities.join(', ')} GB)
+                    </span>
+                  )}
+                  {searchQuery && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                      (from search results)
+                    </span>
+                  )}
                 </p>
               </div>
               <div>
@@ -728,11 +869,10 @@ export default function OrdersManagement() {
                     </svg>
                   </button>
                   
-                  {/* Page numbers - more visible pages for better navigation */}
+                  {/* Page numbers */}
                   {[...Array(totalPages).keys()].map((number) => {
                     const pageNumber = number + 1;
                     
-                    // Show first and last pages, and a range around current page
                     if (
                       pageNumber === 1 ||
                       pageNumber === totalPages ||
@@ -754,7 +894,6 @@ export default function OrdersManagement() {
                       );
                     }
                     
-                    // Show ellipsis for gaps
                     if ((pageNumber === 2 && currentPage > 4) ||
                         (pageNumber === totalPages - 1 && currentPage < totalPages - 3)) {
                       return (
