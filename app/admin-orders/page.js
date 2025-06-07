@@ -41,10 +41,12 @@ export default function OrdersManagement() {
   const [showNetworkCapacityFilter, setShowNetworkCapacityFilter] = useState(false);
   const [availableNetworkCapacities, setAvailableNetworkCapacities] = useState([]);
 
-  // Add state for paginated loading
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  // Add state for server-side operations
   const [totalOrders, setTotalOrders] = useState(0);
-  const [hasLoadedAll, setHasLoadedAll] = useState(false);
+  const [loadAllForExport, setLoadAllForExport] = useState(false);
+  const [serverPage, setServerPage] = useState(1);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [useServerSearch, setUseServerSearch] = useState(true); // Toggle for search mode
 
   // Helper function to extract network from bundle type
   const getNetworkFromBundleType = useCallback((bundleType) => {
@@ -61,7 +63,7 @@ export default function OrdersManagement() {
     return networkMap[bundleType] || 'Unknown';
   }, []);
 
-  // Optimized fetch function with pagination
+  // Main fetch function that always searches server-side
   const fetchOrders = useCallback(async (page = 1, limit = 100, append = false) => {
     try {
       if (!append) {
@@ -69,12 +71,33 @@ export default function OrdersManagement() {
       }
       setError(null);
       
+      // Build query parameters including all filters and search
+      const params = {
+        page,
+        limit,
+        ...filter,
+        search: searchQuery || undefined,
+        excludedCapacities: excludedCapacities.length > 0 ? excludedCapacities.join(',') : undefined,
+        excludedNetworks: excludedNetworks.length > 0 ? excludedNetworks.join(',') : undefined,
+        excludedNetworkCapacities: excludedNetworkCapacities.length > 0 ? excludedNetworkCapacities.join(',') : undefined
+      };
+      
+      // Remove undefined values
+      Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+      
+      // Debug log
+      console.log('Fetching orders with params:', params);
+      if (params.startDate || params.endDate) {
+        console.log('Date filter active:', {
+          startDate: params.startDate,
+          endDate: params.endDate,
+          startDateObj: params.startDate ? new Date(params.startDate) : null,
+          endDateObj: params.endDate ? new Date(params.endDate) : null
+        });
+      }
+      
       const response = await axios.get(`https://iget.onrender.com/api/orders/all`, {
-        params: {
-          page,
-          limit,
-          ...filter // Include current filters in the request
-        },
+        params,
         headers: {
           Authorization: `Bearer ${localStorage.getItem('igettoken')}`
         }
@@ -89,14 +112,14 @@ export default function OrdersManagement() {
           setOrders(newOrders);
         }
         
-        setTotalOrders(response.data.total || newOrders.length);
+        setTotalOrders(response.data.total || 0);
+        setServerPage(response.data.currentPage || page);
+        setServerTotalPages(response.data.pages || 1);
         
-        // Check if we've loaded all orders
-        if (newOrders.length < limit) {
-          setHasLoadedAll(true);
-        }
+        // Apply client-side filtering for immediate response
+        applyClientSideFilters(append ? [...orders, ...newOrders] : newOrders);
         
-        console.log(`Fetched ${newOrders.length} orders (page ${page})`);
+        console.log(`Fetched ${newOrders.length} orders from server (page ${page}), total: ${response.data.total}`);
       } else {
         if (!append) {
           setOrders([]);
@@ -115,89 +138,72 @@ export default function OrdersManagement() {
       }
     } finally {
       setLoading(false);
-      setIsInitialLoad(false);
     }
-  }, [filter]);
+  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
 
-  // Load more orders function
-  const loadMoreOrders = useCallback(async () => {
-    if (!hasLoadedAll && !loading) {
-      const nextPage = Math.ceil(orders.length / 100) + 1;
-      await fetchOrders(nextPage, 100, true);
-    }
-  }, [hasLoadedAll, loading, orders.length, fetchOrders]);
-
-  // Initial load - fetch first batch
-  useEffect(() => {
-    if (isInitialLoad) {
-      fetchOrders(1, 100, false);
-    }
-  }, [isInitialLoad, fetchOrders]);
-
-  // Define the standard capacities
-  const STANDARD_CAPACITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100];
-  
-  // Memoized calculation of available options
-  const { capacities, networks, networkCapacityCombos } = useMemo(() => {
-    if (orders.length === 0) {
-      return { capacities: [], networks: [], networkCapacityCombos: [] };
-    }
-
-    // Capacities
-    const orderCapacities = new Set(orders.map(order => order.capacity).filter(cap => cap !== null && cap !== undefined));
-    const capacities = STANDARD_CAPACITIES.filter(cap => orderCapacities.has(cap));
+  // Load all orders for export (paginated in background)
+  const loadAllOrdersForExport = useCallback(async () => {
+    setLoadAllForExport(true);
+    setLoading(true);
     
-    // Networks
-    const networksSet = new Set(orders.map(order => getNetworkFromBundleType(order.bundleType)));
-    const networks = Array.from(networksSet)
-      .filter(network => network !== 'Unknown')
-      .sort();
-    
-    // Network-Capacity combinations
-    const networkCapacityCombos = [];
-    const existingCombos = new Set();
-    
-    orders.forEach(order => {
-      const network = getNetworkFromBundleType(order.bundleType);
-      if (network !== 'Unknown' && order.capacity !== null && order.capacity !== undefined) {
-        existingCombos.add(`${network}-${order.capacity}`);
-      }
-    });
-    
-    networks.forEach(network => {
-      STANDARD_CAPACITIES.forEach(capacity => {
-        if (existingCombos.has(`${network}-${capacity}`)) {
-          networkCapacityCombos.push({
-            network,
-            capacity,
-            combo: `${network}-${capacity}GB`
-          });
+    try {
+      let allOrders = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const response = await axios.get(`https://iget.onrender.com/api/orders/all`, {
+          params: {
+            page,
+            limit: 1000, // Larger batch for export
+            ...filter,
+            search: searchQuery || undefined,
+            excludedCapacities: excludedCapacities.length > 0 ? excludedCapacities.join(',') : undefined,
+            excludedNetworks: excludedNetworks.length > 0 ? excludedNetworks.join(',') : undefined,
+            excludedNetworkCapacities: excludedNetworkCapacities.length > 0 ? excludedNetworkCapacities.join(',') : undefined
+          },
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          }
+        });
+        
+        if (response.data && response.data.success) {
+          const orders = response.data.data || [];
+          allOrders = [...allOrders, ...orders];
+          
+          if (orders.length < 1000 || allOrders.length >= response.data.total) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+          
+          // Update progress
+          console.log(`Export: Loaded ${allOrders.length} of ${response.data.total} orders`);
+        } else {
+          hasMore = false;
         }
-      });
-    });
-    
-    return { capacities, networks, networkCapacityCombos };
-  }, [orders, getNetworkFromBundleType]);
+      }
+      
+      return allOrders;
+    } catch (err) {
+      console.error('Error loading all orders for export:', err);
+      throw err;
+    } finally {
+      setLoadAllForExport(false);
+      setLoading(false);
+    }
+  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
 
-  // Update state when memoized values change
-  useEffect(() => {
-    setAvailableCapacities(capacities);
-    setAvailableNetworks(networks);
-    setAvailableNetworkCapacities(networkCapacityCombos);
-  }, [capacities, networks, networkCapacityCombos]);
-
-  // Optimized filter function with debounce
-  const applyFilters = useCallback(() => {
-    console.log('Applying filters...');
+  // Client-side filtering (for already loaded orders)
+  const applyClientSideFilters = useCallback((ordersToFilter) => {
+    let result = [...ordersToFilter];
     
-    let result = [...orders];
-    
-    // Apply search filter
-    if (searchQuery.trim() !== '') {
+    // Only apply client-side filters if we're working with loaded data
+    // Server-side search handles these when fetching
+    if (!useServerSearch && searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
       
       result = result.filter(order => {
-        // Optimize search by checking most likely fields first
         const recipientCheck = order.recipientNumber?.toLowerCase().includes(query);
         if (recipientCheck) return true;
         
@@ -207,7 +213,6 @@ export default function OrdersManagement() {
         const referenceCheck = order.orderReference?.toLowerCase().includes(query);
         if (referenceCheck) return true;
         
-        // Check other fields only if needed
         const otherFields = [
           order._id,
           order.user?.username,
@@ -222,71 +227,81 @@ export default function OrdersManagement() {
       });
     }
     
-    // Apply status filter
-    if (filter.status) {
-      result = result.filter(order => order.status === filter.status);
-    }
-    
-    // Apply bundle type filter
-    if (filter.bundleType) {
-      result = result.filter(order => order.bundleType === filter.bundleType);
-    }
-    
-    // Apply date filters with optimized date comparison
-    if (filter.startDate) {
-      const startTime = new Date(filter.startDate).setHours(0, 0, 0, 0);
-      result = result.filter(order => new Date(order.createdAt).getTime() >= startTime);
-    }
-    
-    if (filter.endDate) {
-      const endTime = new Date(filter.endDate).setHours(23, 59, 59, 999);
-      result = result.filter(order => new Date(order.createdAt).getTime() <= endTime);
-    }
-    
-    // Apply exclusion filters
-    if (excludedCapacities.length > 0) {
-      const excludedSet = new Set(excludedCapacities);
-      result = result.filter(order => !excludedSet.has(order.capacity));
-    }
-    
-    if (excludedNetworks.length > 0) {
-      const excludedSet = new Set(excludedNetworks);
-      result = result.filter(order => {
-        const network = getNetworkFromBundleType(order.bundleType);
-        return !excludedSet.has(network);
-      });
-    }
-    
-    if (excludedNetworkCapacities.length > 0) {
-      const excludedSet = new Set(excludedNetworkCapacities);
-      result = result.filter(order => {
-        const network = getNetworkFromBundleType(order.bundleType);
-        const combo = `${network}-${order.capacity}GB`;
-        return !excludedSet.has(combo);
-      });
-    }
-    
     setFilteredOrders(result);
     const total = Math.ceil(result.length / itemsPerPage);
     setTotalPages(total > 0 ? total : 1);
     setCurrentPage(1);
     
-    console.log(`Filtered: ${result.length} orders`);
-  }, [orders, searchQuery, filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities, itemsPerPage, getNetworkFromBundleType]);
+    console.log(`Client-side filtered: ${result.length} orders`);
+  }, [searchQuery, itemsPerPage, useServerSearch]);
 
-  // Debounce search
+  // Initial load
+  useEffect(() => {
+    fetchOrders(1, 100);
+  }, []);
+
+  // Debounced search - triggers server request
   useEffect(() => {
     const timer = setTimeout(() => {
-      applyFilters();
-    }, 300);
+      if (useServerSearch) {
+        fetchOrders(1, 100);
+      } else {
+        applyClientSideFilters(orders);
+      }
+    }, 500); // 500ms delay for server search
     
     return () => clearTimeout(timer);
-  }, [searchQuery, applyFilters]);
+  }, [searchQuery, useServerSearch]);
 
-  // Apply filters when other dependencies change
+  // Apply filters - always fetches from server
   useEffect(() => {
-    applyFilters();
-  }, [filter, orders, excludedCapacities, excludedNetworks, excludedNetworkCapacities, applyFilters]);
+    fetchOrders(1, 100);
+  }, [filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
+
+  // Define the standard capacities
+  const STANDARD_CAPACITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100];
+  
+  // Calculate available options from loaded orders
+  useEffect(() => {
+    if (orders.length > 0) {
+      // Capacities
+      const orderCapacities = new Set(orders.map(order => order.capacity).filter(cap => cap !== null && cap !== undefined));
+      const capacities = STANDARD_CAPACITIES.filter(cap => orderCapacities.has(cap));
+      setAvailableCapacities(capacities);
+      
+      // Networks
+      const networksSet = new Set(orders.map(order => getNetworkFromBundleType(order.bundleType)));
+      const networks = Array.from(networksSet)
+        .filter(network => network !== 'Unknown')
+        .sort();
+      setAvailableNetworks(networks);
+      
+      // Network-Capacity combinations
+      const networkCapacityCombos = [];
+      const existingCombos = new Set();
+      
+      orders.forEach(order => {
+        const network = getNetworkFromBundleType(order.bundleType);
+        if (network !== 'Unknown' && order.capacity !== null && order.capacity !== undefined) {
+          existingCombos.add(`${network}-${order.capacity}`);
+        }
+      });
+      
+      networks.forEach(network => {
+        STANDARD_CAPACITIES.forEach(capacity => {
+          if (existingCombos.has(`${network}-${capacity}`)) {
+            networkCapacityCombos.push({
+              network,
+              capacity,
+              combo: `${network}-${capacity}GB`
+            });
+          }
+        });
+      });
+      
+      setAvailableNetworkCapacities(networkCapacityCombos);
+    }
+  }, [orders, getNetworkFromBundleType]);
 
   // Update displayed orders based on pagination
   useEffect(() => {
@@ -298,6 +313,7 @@ export default function OrdersManagement() {
   // Handlers
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
+    setCurrentPage(1); // Reset to first page on new search
   };
 
   const clearSearch = () => {
@@ -335,6 +351,11 @@ export default function OrdersManagement() {
             order._id === orderId ? { ...order, status: newStatus } : order
           )
         );
+        setFilteredOrders(prevFiltered =>
+          prevFiltered.map(order =>
+            order._id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
       } else {
         setError('Failed to update order status');
       }
@@ -354,7 +375,7 @@ export default function OrdersManagement() {
       setLoading(true);
       setError(null);
       
-      // Process in batches of 10 to avoid overwhelming the server
+      // Process in batches of 10
       const batchSize = 10;
       const batches = [];
       
@@ -377,8 +398,14 @@ export default function OrdersManagement() {
         await Promise.all(updatePromises);
       }
       
+      // Update local state
       setOrders(prevOrders => 
         prevOrders.map(order => 
+          selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
+        )
+      );
+      setFilteredOrders(prevFiltered =>
+        prevFiltered.map(order =>
           selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
         )
       );
@@ -411,22 +438,22 @@ export default function OrdersManagement() {
     }
   };
 
-  const handleSelectAllFiltered = () => {
-    const ordersToSelect = filteredOrders
-      .filter(order => {
-        if (excludedCapacities.includes(order.capacity)) return false;
-        const network = getNetworkFromBundleType(order.bundleType);
-        if (excludedNetworks.includes(network)) return false;
-        const combo = `${network}-${order.capacity}GB`;
-        if (excludedNetworkCapacities.includes(combo)) return false;
-        return true;
-      })
-      .map(order => order._id);
-    
-    if (selectedOrders.length === ordersToSelect.length) {
-      setSelectedOrders([]);
-    } else {
-      setSelectedOrders(ordersToSelect);
+  const handleSelectAllFiltered = async () => {
+    try {
+      setLoading(true);
+      // Load all filtered orders from server
+      const allFilteredOrders = await loadAllOrdersForExport();
+      const orderIds = allFilteredOrders.map(order => order._id);
+      
+      if (selectedOrders.length === orderIds.length) {
+        setSelectedOrders([]);
+      } else {
+        setSelectedOrders(orderIds);
+      }
+    } catch (err) {
+      setError('Failed to select all filtered orders');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -437,8 +464,13 @@ export default function OrdersManagement() {
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
-    // Refetch from server with filters
-    fetchOrders(1, 100, false);
+    fetchOrders(1, 100);
+  };
+
+  const loadMoreOrders = () => {
+    if (serverPage < serverTotalPages) {
+      fetchOrders(serverPage + 1, 100, true);
+    }
   };
 
   const resetAll = () => {
@@ -508,27 +540,24 @@ export default function OrdersManagement() {
 
   const exportToExcel = async () => {
     try {
-      // Show loading indicator for export
       setLoading(true);
       
-      const ordersToExport = selectedOrders.length > 0 
-        ? orders.filter(order => selectedOrders.includes(order._id))
-        : filteredOrders;
+      let ordersToExport;
       
-      // Process in chunks to avoid blocking UI
-      const chunkSize = 1000;
-      const excelData = [];
-      
-      for (let i = 0; i < ordersToExport.length; i += chunkSize) {
-        const chunk = ordersToExport.slice(i, i + chunkSize);
-        const chunkData = chunk.map(order => ({
-          'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
-          'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
-          'Network': getNetworkFromBundleType(order.bundleType),
-          'Bundle Type': order.bundleType || 'N/A'
-        }));
-        excelData.push(...chunkData);
+      if (selectedOrders.length > 0) {
+        // Export only selected orders from current view
+        ordersToExport = orders.filter(order => selectedOrders.includes(order._id));
+      } else {
+        // Export ALL filtered orders from server
+        ordersToExport = await loadAllOrdersForExport();
       }
+      
+      const excelData = ordersToExport.map(order => ({
+        'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
+        'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
+        'Network': getNetworkFromBundleType(order.bundleType),
+        'Bundle Type': order.bundleType || 'N/A'
+      }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const workbook = XLSX.utils.book_new();
@@ -545,7 +574,7 @@ export default function OrdersManagement() {
       
       const filename = selectedOrders.length > 0 
         ? `Selected_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx` 
-        : `Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
+        : `All_Filtered_Orders_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
       
       XLSX.writeFile(workbook, filename);
     } catch (err) {
@@ -607,18 +636,10 @@ export default function OrdersManagement() {
                 </select>
                 <button
                   onClick={handleSelectAllFiltered}
-                  className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled={loading}
+                  className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
-                  {selectedOrders.length === filteredOrders.filter(order => {
-                    if (excludedCapacities.includes(order.capacity)) return false;
-                    const network = getNetworkFromBundleType(order.bundleType);
-                    if (excludedNetworks.includes(network)) return false;
-                    const combo = `${network}-${order.capacity}GB`;
-                    if (excludedNetworkCapacities.includes(combo)) return false;
-                    return true;
-                  }).length 
-                    ? "Deselect All Filtered" 
-                    : "Select All Filtered Orders"}
+                  {loading ? 'Loading...' : 'Select All Filtered (Server)'}
                 </button>
               </div>
             ) : null}
@@ -632,25 +653,12 @@ export default function OrdersManagement() {
               </svg>
               {selectedOrders.length > 0 
                 ? `Export Selected (${selectedOrders.length})` 
-                : `Export All Filtered (${filteredOrders.length})`}
+                : `Export All Filtered (${totalOrders})`}
             </button>
           </div>
         </div>
 
-        {/* Load More Button for fetching additional orders */}
-        {!hasLoadedAll && orders.length > 0 && orders.length < totalOrders && (
-          <div className="mb-4 text-center">
-            <button
-              onClick={loadMoreOrders}
-              disabled={loading}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Loading...' : `Load More Orders (${orders.length} of ${totalOrders})`}
-            </button>
-          </div>
-        )}
-
-        {/* Search Bar */}
+        {/* Search Bar with Server/Client toggle */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-4">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -679,16 +687,26 @@ export default function OrdersManagement() {
           {searchQuery && (
             <div className="mt-2 space-y-1">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Searching across {orders.length} loaded orders...
+                {useServerSearch 
+                  ? `Searching across ALL ${totalOrders} orders on server...`
+                  : `Searching across ${orders.length} loaded orders...`}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-500">
-                Tip: Try searching with different formats (e.g., with/without country code: 0241234567 or 233241234567)
-              </p>
+              <label className="flex items-center space-x-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={useServerSearch}
+                  onChange={(e) => setUseServerSearch(e.target.checked)}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-gray-500 dark:text-gray-400">
+                  Search all orders on server (recommended for finding specific orders)
+                </span>
+              </label>
             </div>
           )}
         </div>
 
-        {/* Filter Form with Exclusion Buttons */}
+        {/* Filter Form */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
           <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -907,7 +925,7 @@ export default function OrdersManagement() {
 
         {/* Data Stats */}
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
-          <div>Total Orders: <span className="font-semibold">{totalOrders || orders.length}</span></div>
+          <div>Total Orders (Server): <span className="font-semibold">{totalOrders}</span></div>
           <div>Loaded Orders: <span className="font-semibold">{orders.length}</span></div>
           <div>Filtered Orders: <span className="font-semibold">{filteredOrders.length}</span></div>
           <div>Current Page: <span className="font-semibold">{currentPage} of {totalPages}</span></div>
@@ -922,6 +940,13 @@ export default function OrdersManagement() {
           {excludedNetworkCapacities.length > 0 && (
             <div>Excluded Combos: <span className="font-semibold">{excludedNetworkCapacities.length} items</span></div>
           )}
+          {(filter.startDate || filter.endDate) && (
+            <div className="text-orange-600 dark:text-orange-400 font-semibold">
+              Date Filter: {filter.startDate && `From ${new Date(filter.startDate).toLocaleDateString()}`} 
+              {filter.startDate && filter.endDate && ' to '} 
+              {filter.endDate && `${new Date(filter.endDate).toLocaleDateString()}`}
+            </div>
+          )}
           {searchQuery && (
             <div className="text-blue-600 dark:text-blue-400 font-semibold">
               Search Results: {filteredOrders.length} matching "{searchQuery}"
@@ -929,13 +954,26 @@ export default function OrdersManagement() {
           )}
         </div>
 
+        {/* Load More Button */}
+        {serverPage < serverTotalPages && (
+          <div className="mb-4 text-center">
+            <button
+              onClick={loadMoreOrders}
+              disabled={loading}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {loading ? 'Loading...' : `Load More Orders (Page ${serverPage + 1} of ${serverTotalPages})`}
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-100 p-4 mb-4" role="alert">
             <p>{error}</p>
           </div>
         )}
 
-        {loading && isInitialLoad ? (
+        {loading && orders.length === 0 ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
@@ -1100,15 +1138,10 @@ export default function OrdersManagement() {
                   <span className="font-medium">
                     {Math.min(currentPage * itemsPerPage, filteredOrders.length)}
                   </span> of{' '}
-                  <span className="font-medium">{filteredOrders.length}</span> orders
-                  {(excludedCapacities.length > 0 || excludedNetworks.length > 0 || excludedNetworkCapacities.length > 0) && (
+                  <span className="font-medium">{filteredOrders.length}</span> filtered orders
+                  {totalOrders > filteredOrders.length && (
                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      (with exclusions applied)
-                    </span>
-                  )}
-                  {searchQuery && (
-                    <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                      (from search results)
+                      (from {totalOrders} total)
                     </span>
                   )}
                 </p>
