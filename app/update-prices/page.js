@@ -1,7 +1,21 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, RefreshCw, Search, AlertCircle, X, Edit2, Save, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  Loader2, 
+  RefreshCw, 
+  Search, 
+  AlertCircle, 
+  X, 
+  Edit2, 
+  Save, 
+  Check, 
+  ChevronDown, 
+  ChevronUp,
+  Package,
+  PackageX,
+  Info
+} from 'lucide-react';
 import axios from 'axios';
 import AdminLayout from '@/components/adminWraper';
 
@@ -22,6 +36,7 @@ const BundlePriceList = () => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [expandedBundle, setExpandedBundle] = useState(null);
+  const [stockUpdateLoading, setStockUpdateLoading] = useState({});
   
   const bundleTypes = [
     'mtnup2u',
@@ -72,6 +87,58 @@ const BundlePriceList = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const toggleStock = async (bundleId, bundleType, currentStockStatus) => {
+    setStockUpdateLoading(prev => ({ ...prev, [bundleId]: true }));
+    
+    try {
+      const token = localStorage.getItem('igettoken');
+      const endpoint = currentStockStatus 
+        ? `/api/iget/stock/${bundleId}/out-of-stock`
+        : `/api/iget/stock/${bundleId}/in-stock`;
+      
+      const requestBody = currentStockStatus 
+        ? { reason: 'Marked out of stock by admin' }
+        : {};
+      
+      const response = await axios.put(
+        `https://iget.onrender.com${endpoint}`,
+        requestBody,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      // Update local state
+      setBundleData(prevData => {
+        const updatedBundles = [...(prevData[bundleType] || [])];
+        const bundleIndex = updatedBundles.findIndex(b => b._id === bundleId);
+        
+        if (bundleIndex !== -1) {
+          updatedBundles[bundleIndex] = {
+            ...updatedBundles[bundleIndex],
+            isInStock: !currentStockStatus,
+            stockInfo: response.data.data?.stockStatus || {
+              isInStock: !currentStockStatus,
+              isOutOfStock: currentStockStatus
+            }
+          };
+        }
+        
+        return {
+          ...prevData,
+          [bundleType]: updatedBundles
+        };
+      });
+      
+      setSuccessMessage(`Bundle marked as ${currentStockStatus ? 'out of stock' : 'in stock'}`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update stock status');
+    } finally {
+      setStockUpdateLoading(prev => ({ ...prev, [bundleId]: false }));
     }
   };
 
@@ -198,7 +265,7 @@ const BundlePriceList = () => {
     <AdminLayout>
       <div className="max-w-7xl mx-auto p-4 space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bundle Prices</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bundle Prices & Stock Management</h1>
           
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <div className="relative flex-grow sm:flex-grow-0">
@@ -274,136 +341,199 @@ const BundlePriceList = () => {
                 </div>
                 
                 <div className="p-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {bundles.map((bundle) => (
-                      <div 
-                        key={bundle._id}
-                        className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg"
-                      >
-                        {editingBundle === bundle._id ? (
-                          // Editing mode
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {(bundle.capacity)} GB
-                              </span>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              {/* Standard price edit */}
-                              <div className="flex items-center">
-                                <span className="text-gray-700 dark:text-gray-300 mr-2 w-20">Standard:</span>
-                                <div className="flex items-center flex-1">
-                                  <span className="text-gray-700 dark:text-gray-300 mr-1">GH¢</span>
-                                  <input
-                                    type="number"
-                                    value={editPrices.standard}
-                                    onChange={(e) => handlePriceChange('standard', e.target.value)}
-                                    className="flex-grow p-1 border rounded w-full bg-white dark:bg-gray-600 text-gray-900 dark:text-white"
-                                    step="0.01"
-                                    min="0"
-                                  />
-                                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {bundles.map((bundle) => {
+                      const isInStock = bundle.stockInfo?.isOutOfStock === false || 
+                                      (bundle.isInStock !== false && !bundle.stockInfo?.isOutOfStock);
+                      
+                      return (
+                        <div 
+                          key={bundle._id}
+                          className={`bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-2 ${
+                            isInStock 
+                              ? 'border-transparent' 
+                              : 'border-red-300 dark:border-red-700'
+                          }`}
+                        >
+                          {editingBundle === bundle._id ? (
+                            // Editing mode
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                                  {bundle.capacity} GB
+                                </span>
                               </div>
                               
-                              {/* Role-based prices edit */}
-                              {userRoles.map(role => (
-                                <div key={role.id} className="flex items-center">
-                                  <span className="text-gray-700 dark:text-gray-300 mr-2 w-20 capitalize">
-                                    {role.label}:
-                                  </span>
+                              <div className="space-y-2">
+                                {/* Standard price edit */}
+                                <div className="flex items-center">
+                                  <span className="text-gray-700 dark:text-gray-300 mr-2 w-20 text-sm">Standard:</span>
                                   <div className="flex items-center flex-1">
-                                    <span className="text-gray-700 dark:text-gray-300 mr-1">GH¢</span>
+                                    <span className="text-gray-700 dark:text-gray-300 mr-1 text-sm">GH¢</span>
                                     <input
                                       type="number"
-                                      value={editPrices[role.id]}
-                                      onChange={(e) => handlePriceChange(role.id, e.target.value)}
-                                      className="flex-grow p-1 border rounded w-full bg-white dark:bg-gray-600 text-gray-900 dark:text-white"
+                                      value={editPrices.standard}
+                                      onChange={(e) => handlePriceChange('standard', e.target.value)}
+                                      className="flex-grow p-1 border rounded w-full bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-sm"
                                       step="0.01"
                                       min="0"
                                     />
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                            
-                            <div className="flex justify-between mt-2">
-                              <button
-                                onClick={() => updateBundlePrice(bundle._id, type)}
-                                disabled={updateLoading}
-                                className="p-2 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-700 flex items-center gap-1"
-                              >
-                                {updateLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                                Save
-                              </button>
-                              <button
-                                onClick={cancelEditing}
-                                className="p-2 text-sm bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center gap-1"
-                              >
-                                <X className="w-3 h-3" />
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          // Display mode
-                          <div className="flex flex-col">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {(bundle.capacity)} GB
-                              </span>
-                              <button
-                                onClick={() => startEditing(bundle)}
-                                className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                title="Edit prices"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                            
-                            <div className="flex justify-between items-center mt-2">
-                              <div className="text-gray-700 dark:text-gray-300 font-medium">
-                                GH¢ {parseFloat(bundle.price).toFixed(2)}
-                              </div>
-                              <button 
-                                onClick={() => toggleBundleDetails(bundle._id)}
-                                className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                title={expandedBundle === bundle._id ? "Hide role prices" : "Show role prices"}
-                              >
-                                {expandedBundle === bundle._id ? (
-                                  <ChevronUp className="w-4 h-4" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4" />
-                                )}
-                              </button>
-                            </div>
-                            
-                            {/* Expanded role pricing details */}
-                            {expandedBundle === bundle._id && (
-                              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-sm">
-                                <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Role Prices:</h4>
-                                {bundle.rolePricing ? (
-                                  <div className="space-y-1">
-                                    {userRoles.map(role => (
-                                      <div key={role.id} className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400 capitalize">{role.label}:</span>
-                                        <span className="text-gray-800 dark:text-gray-200">
-                                          GH¢ {parseFloat(bundle.rolePricing[role.id] || bundle.price).toFixed(2)}
-                                        </span>
-                                      </div>
-                                    ))}
+                                
+                                {/* Role-based prices edit */}
+                                {userRoles.map(role => (
+                                  <div key={role.id} className="flex items-center">
+                                    <span className="text-gray-700 dark:text-gray-300 mr-2 w-20 capitalize text-sm">
+                                      {role.label}:
+                                    </span>
+                                    <div className="flex items-center flex-1">
+                                      <span className="text-gray-700 dark:text-gray-300 mr-1 text-sm">GH¢</span>
+                                      <input
+                                        type="number"
+                                        value={editPrices[role.id]}
+                                        onChange={(e) => handlePriceChange(role.id, e.target.value)}
+                                        className="flex-grow p-1 border rounded w-full bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-sm"
+                                        step="0.01"
+                                        min="0"
+                                      />
+                                    </div>
                                   </div>
-                                ) : (
-                                  <p className="text-gray-500 dark:text-gray-400">
-                                    No role-specific pricing set
-                                  </p>
-                                )}
+                                ))}
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                              
+                              <div className="flex justify-between mt-2">
+                                <button
+                                  onClick={() => updateBundlePrice(bundle._id, type)}
+                                  disabled={updateLoading}
+                                  className="p-2 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-700 flex items-center gap-1"
+                                >
+                                  {updateLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                  Save
+                                </button>
+                                <button
+                                  onClick={cancelEditing}
+                                  className="p-2 text-sm bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-500 flex items-center gap-1"
+                                >
+                                  <X className="w-3 h-3" />
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            // Display mode
+                            <div className="flex flex-col">
+                              {/* Stock status indicator */}
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                  {isInStock ? (
+                                    <Package className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  ) : (
+                                    <PackageX className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  )}
+                                  <span className={`text-xs font-medium ${
+                                    isInStock 
+                                      ? 'text-green-600 dark:text-green-400' 
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {isInStock ? 'In Stock' : 'Out of Stock'}
+                                  </span>
+                                </div>
+                                
+                                {/* Stock toggle button */}
+                                <button
+                                  onClick={() => toggleStock(bundle._id, type, isInStock)}
+                                  disabled={stockUpdateLoading[bundle._id]}
+                                  className={`p-1 rounded ${
+                                    isInStock 
+                                      ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' 
+                                      : 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                  }`}
+                                  title={isInStock ? 'Mark as out of stock' : 'Mark as in stock'}
+                                >
+                                  {stockUpdateLoading[bundle._id] ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : isInStock ? (
+                                    <PackageX className="w-4 h-4" />
+                                  ) : (
+                                    <Package className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                              
+                              <div className="flex justify-between items-center">
+                                <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                                  {bundle.capacity} GB
+                                </span>
+                                <button
+                                  onClick={() => startEditing(bundle)}
+                                  className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  title="Edit prices"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                              
+                              <div className="flex justify-between items-center mt-2">
+                                <div className="text-gray-700 dark:text-gray-300 font-medium">
+                                  GH¢ {parseFloat(bundle.price).toFixed(2)}
+                                </div>
+                                <button 
+                                  onClick={() => toggleBundleDetails(bundle._id)}
+                                  className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                  title={expandedBundle === bundle._id ? "Hide details" : "Show details"}
+                                >
+                                  {expandedBundle === bundle._id ? (
+                                    <ChevronUp className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                              
+                              {/* Expanded details */}
+                              {expandedBundle === bundle._id && (
+                                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                                  {/* Stock info if out of stock */}
+                                  {!isInStock && bundle.stockInfo?.reason && (
+                                    <div className="mb-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm">
+                                      <div className="flex items-start gap-1">
+                                        <Info className="w-3 h-3 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                        <div className="text-red-700 dark:text-red-300">
+                                          <p className="font-medium">Reason:</p>
+                                          <p className="text-xs">{bundle.stockInfo.reason}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Role pricing */}
+                                  <div className="text-sm">
+                                    <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Role Prices:</h4>
+                                    {bundle.rolePricing ? (
+                                      <div className="space-y-1">
+                                        {userRoles.map(role => (
+                                          <div key={role.id} className="flex justify-between">
+                                            <span className="text-gray-600 dark:text-gray-400 capitalize">{role.label}:</span>
+                                            <span className="text-gray-800 dark:text-gray-200">
+                                              GH¢ {parseFloat(bundle.rolePricing[role.id] || bundle.price).toFixed(2)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-gray-500 dark:text-gray-400">
+                                        No role-specific pricing set
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
