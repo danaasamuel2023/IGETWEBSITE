@@ -4,13 +4,15 @@ import axios from 'axios';
 import Head from 'next/head';
 import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
-import { Phone, User, Search } from 'lucide-react';
+import { Phone, User, Search, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [displayedOrders, setDisplayedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -48,6 +50,11 @@ export default function OrdersManagement() {
   const [serverTotalPages, setServerTotalPages] = useState(1);
   const [useServerSearch, setUseServerSearch] = useState(true); // Toggle for search mode
 
+  // New states for optimized bulk updates
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [bulkUpdateProgress, setBulkUpdateProgress] = useState(0);
+  const [updateSuccessMessage, setUpdateSuccessMessage] = useState('');
+
   // Helper function to extract network from bundle type
   const getNetworkFromBundleType = useCallback((bundleType) => {
     if (!bundleType) return 'Unknown';
@@ -66,8 +73,15 @@ export default function OrdersManagement() {
   // Main fetch function that always searches server-side
   const fetchOrders = useCallback(async (page = 1, limit = 100, append = false) => {
     try {
+      // Skip fetching if we're doing bulk updates
+      if (isBulkUpdating) return;
+      
       if (!append) {
-        setLoading(true);
+        if (orders.length === 0) {
+          setInitialLoading(true);
+        }
+      } else {
+        setPageLoading(true);
       }
       setError(null);
       
@@ -137,14 +151,14 @@ export default function OrdersManagement() {
         setDisplayedOrders([]);
       }
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setPageLoading(false);
     }
-  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
+  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities, isBulkUpdating, orders]);
 
   // Load all orders for export (paginated in background)
   const loadAllOrdersForExport = useCallback(async () => {
     setLoadAllForExport(true);
-    setLoading(true);
     
     try {
       let allOrders = [];
@@ -190,12 +204,11 @@ export default function OrdersManagement() {
       throw err;
     } finally {
       setLoadAllForExport(false);
-      setLoading(false);
     }
   }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
 
   // Client-side filtering (for already loaded orders)
-  const applyClientSideFilters = useCallback((ordersToFilter) => {
+  const applyClientSideFilters = useCallback((ordersToFilter, resetPage = true) => {
     let result = [...ordersToFilter];
     
     // Only apply client-side filters if we're working with loaded data
@@ -230,7 +243,11 @@ export default function OrdersManagement() {
     setFilteredOrders(result);
     const total = Math.ceil(result.length / itemsPerPage);
     setTotalPages(total > 0 ? total : 1);
-    setCurrentPage(1);
+    
+    // Only reset page if explicitly requested
+    if (resetPage) {
+      setCurrentPage(1);
+    }
     
     console.log(`Client-side filtered: ${result.length} orders`);
   }, [searchQuery, itemsPerPage, useServerSearch]);
@@ -243,10 +260,10 @@ export default function OrdersManagement() {
   // Debounced search - triggers server request
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (useServerSearch) {
+      if (useServerSearch && searchQuery) {
         fetchOrders(1, 100);
-      } else {
-        applyClientSideFilters(orders);
+      } else if (!useServerSearch && orders.length > 0) {
+        applyClientSideFilters(orders, true);
       }
     }, 500); // 500ms delay for server search
     
@@ -255,8 +272,10 @@ export default function OrdersManagement() {
 
   // Apply filters - always fetches from server
   useEffect(() => {
-    fetchOrders(1, 100);
-  }, [filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
+    if (!isBulkUpdating) {
+      fetchOrders(1, 100);
+    }
+  }, [filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities, fetchOrders, isBulkUpdating]);
 
   // Define the standard capacities
   const STANDARD_CAPACITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100];
@@ -310,6 +329,21 @@ export default function OrdersManagement() {
     setDisplayedOrders(paginatedResult);
   }, [filteredOrders, currentPage, itemsPerPage]);
 
+  // Pagination handler
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (updateSuccessMessage) {
+      const timer = setTimeout(() => {
+        setUpdateSuccessMessage('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [updateSuccessMessage]);
+
   // Handlers
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -346,16 +380,22 @@ export default function OrdersManagement() {
       });
       
       if (response.data && response.data.success) {
+        // Update local state immediately
         setOrders(prevOrders => 
           prevOrders.map(order => 
-            order._id === orderId ? { ...order, status: newStatus } : order
+            order._id === orderId 
+              ? { ...order, status: newStatus, updatedAt: new Date() } 
+              : order
           )
         );
         setFilteredOrders(prevFiltered =>
           prevFiltered.map(order =>
-            order._id === orderId ? { ...order, status: newStatus } : order
+            order._id === orderId 
+              ? { ...order, status: newStatus, updatedAt: new Date() } 
+              : order
           )
         );
+        setUpdateSuccessMessage(`Order ${orderId.substring(0, 8)}... updated to ${newStatus}`);
       } else {
         setError('Failed to update order status');
       }
@@ -365,6 +405,7 @@ export default function OrdersManagement() {
     }
   };
 
+  // Optimized bulk status change using the new endpoint
   const handleBulkStatusChange = async (newStatus) => {
     if (!newStatus || selectedOrders.length === 0) {
       setError('Please select at least one order and a status to update');
@@ -372,51 +413,70 @@ export default function OrdersManagement() {
     }
 
     try {
-      setLoading(true);
+      setIsBulkUpdating(true);
       setError(null);
+      setBulkUpdateProgress(0);
       
-      // Process in batches of 10
-      const batchSize = 10;
-      const batches = [];
+      // Use the new bulk endpoint
+      const response = await axios.put(
+        'https://iget.onrender.com/api/orders/bulk-status',
+        {
+          orderIds: selectedOrders,
+          status: newStatus,
+          senderID: senderID,
+          sendSMSNotification: true // Can be made configurable
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setBulkUpdateProgress(percentCompleted);
+          }
+        }
+      );
       
-      for (let i = 0; i < selectedOrders.length; i += batchSize) {
-        batches.push(selectedOrders.slice(i, i + batchSize));
-      }
-      
-      for (const batch of batches) {
-        const updatePromises = batch.map(orderId => 
-          axios.put(`https://iget.onrender.com/api/orders/${orderId}/status`, {
-            status: newStatus,
-            senderID: senderID
-          }, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('igettoken')}`
-            }
-          })
+      if (response.data.success) {
+        // Update local state without re-fetching
+        const updatedOrderIds = new Set(selectedOrders);
+        
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            updatedOrderIds.has(order._id) 
+              ? { ...order, status: newStatus, updatedAt: new Date() } 
+              : order
+          )
         );
         
-        await Promise.all(updatePromises);
+        setFilteredOrders(prevFiltered => 
+          prevFiltered.map(order => 
+            updatedOrderIds.has(order._id) 
+              ? { ...order, status: newStatus, updatedAt: new Date() } 
+              : order
+          )
+        );
+        
+        // Clear selections and show success
+        setSelectedOrders([]);
+        setBulkStatus('');
+        setUpdateSuccessMessage(
+          `Successfully updated ${response.data.data.modified} orders to ${newStatus}`
+        );
+        
+        // Log detailed results
+        console.log('Bulk update results:', response.data.data);
+        
+        // Re-apply filters on existing data without server fetch
+        applyClientSideFilters(orders, false);
       }
       
-      // Update local state
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
-        )
-      );
-      setFilteredOrders(prevFiltered =>
-        prevFiltered.map(order =>
-          selectedOrders.includes(order._id) ? { ...order, status: newStatus } : order
-        )
-      );
-      
-      setSelectedOrders([]);
-      setBulkStatus('');
     } catch (err) {
-      setError('Failed to update multiple orders');
-      console.error('Error updating multiple orders:', err);
+      setError(err.response?.data?.message || 'Failed to update orders');
+      console.error('Bulk update error:', err);
     } finally {
-      setLoading(false);
+      setIsBulkUpdating(false);
+      setBulkUpdateProgress(0);
     }
   };
 
@@ -440,7 +500,6 @@ export default function OrdersManagement() {
 
   const handleSelectAllFiltered = async () => {
     try {
-      setLoading(true);
       // Load all filtered orders from server
       const allFilteredOrders = await loadAllOrdersForExport();
       const orderIds = allFilteredOrders.map(order => order._id);
@@ -452,8 +511,6 @@ export default function OrdersManagement() {
       }
     } catch (err) {
       setError('Failed to select all filtered orders');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -540,8 +597,6 @@ export default function OrdersManagement() {
 
   const exportToExcel = async () => {
     try {
-      setLoading(true);
-      
       let ordersToExport;
       
       if (selectedOrders.length > 0) {
@@ -580,8 +635,6 @@ export default function OrdersManagement() {
     } catch (err) {
       setError('Failed to export orders to Excel');
       console.error('Error exporting orders:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -592,6 +645,39 @@ export default function OrdersManagement() {
       </Head>
       
       <div className="p-4 sm:p-6 max-w-7xl mx-auto bg-white dark:bg-gray-900">
+        {/* Success Message */}
+        {updateSuccessMessage && (
+          <div className="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 dark:bg-green-900 dark:border-green-700 dark:text-green-100 p-4 rounded-lg flex items-center animate-fade-in">
+            <CheckCircle className="h-5 w-5 mr-2" />
+            <p>{updateSuccessMessage}</p>
+          </div>
+        )}
+
+        {/* Bulk Update Progress Modal */}
+        {isBulkUpdating && bulkUpdateProgress > 0 && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                Updating Orders...
+              </h3>
+              <div className="mb-4">
+                <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${bulkUpdateProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  {Math.round(bulkUpdateProgress)}% complete
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Please wait while we update your selected orders...
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header with Sender ID input */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold mb-4 sm:mb-0 text-gray-900 dark:text-white">Order Management</h1>
@@ -620,12 +706,12 @@ export default function OrdersManagement() {
                   className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md p-2"
                   value={bulkStatus}
                   onChange={(e) => {
+                    setBulkStatus(e.target.value);
                     if (e.target.value) {
                       handleBulkStatusChange(e.target.value);
-                    } else {
-                      setBulkStatus(e.target.value);
                     }
                   }}
+                  disabled={isBulkUpdating}
                 >
                   <option value="">Bulk Update Status</option>
                   <option value="pending">Set All to Pending</option>
@@ -636,24 +722,25 @@ export default function OrdersManagement() {
                 </select>
                 <button
                   onClick={handleSelectAllFiltered}
-                  disabled={loading}
+                  disabled={loadAllForExport || isBulkUpdating}
                   className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
-                  {loading ? 'Loading...' : 'Select All Filtered (Server)'}
+                  {loadAllForExport ? 'Loading...' : 'Select All Filtered (Server)'}
                 </button>
               </div>
             ) : null}
             <button
               onClick={exportToExcel}
-              disabled={loading}
+              disabled={loadAllForExport || isBulkUpdating}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {selectedOrders.length > 0 
-                ? `Export Selected (${selectedOrders.length})` 
-                : `Export All Filtered (${totalOrders})`}
+              {loadAllForExport ? 'Exporting...' : 
+                selectedOrders.length > 0 
+                  ? `Export Selected (${selectedOrders.length})` 
+                  : `Export All Filtered (${totalOrders})`}
             </button>
           </div>
         </div>
@@ -670,12 +757,14 @@ export default function OrdersManagement() {
               className="pl-10 pr-10 py-2 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
               value={searchQuery}
               onChange={handleSearchChange}
+              disabled={isBulkUpdating}
             />
             {searchQuery && (
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                 <button 
                   onClick={clearSearch}
                   className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none"
+                  disabled={isBulkUpdating}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -697,6 +786,7 @@ export default function OrdersManagement() {
                   checked={useServerSearch}
                   onChange={(e) => setUseServerSearch(e.target.checked)}
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  disabled={isBulkUpdating}
                 />
                 <span className="text-gray-500 dark:text-gray-400">
                   Search all orders on server (recommended for finding specific orders)
@@ -717,6 +807,7 @@ export default function OrdersManagement() {
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.status}
                 onChange={handleFilterChange}
+                disabled={isBulkUpdating}
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -735,6 +826,7 @@ export default function OrdersManagement() {
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.bundleType}
                 onChange={handleFilterChange}
+                disabled={isBulkUpdating}
               >
                 <option value="">All Types</option>
                 <option value="mtnup2u">MTN Up2U</option>
@@ -754,6 +846,7 @@ export default function OrdersManagement() {
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.startDate}
                 onChange={handleFilterChange}
+                disabled={isBulkUpdating}
               />
             </div>
             
@@ -766,27 +859,31 @@ export default function OrdersManagement() {
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                 value={filter.endDate}
                 onChange={handleFilterChange}
+                disabled={isBulkUpdating}
               />
             </div>
             
             <div className="md:col-span-2 lg:col-span-4 flex flex-wrap gap-2">
               <button
                 type="submit"
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                disabled={isBulkUpdating}
               >
                 Apply Filters
               </button>
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                disabled={isBulkUpdating}
               >
                 Clear Filters
               </button>
               <button
                 type="button"
                 onClick={resetAll}
-                className="inline-flex justify-center py-2 px-4 border border-red-300 dark:border-red-600 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="inline-flex justify-center py-2 px-4 border border-red-300 dark:border-red-600 shadow-sm text-sm font-medium rounded-md text-red-700 dark:text-red-200 bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                disabled={isBulkUpdating}
               >
                 Reset All (Search & Filters)
               </button>
@@ -794,6 +891,7 @@ export default function OrdersManagement() {
                 type="button"
                 onClick={() => setShowCapacityFilter(!showCapacityFilter)}
                 className="inline-flex justify-center py-2 px-4 border border-blue-300 dark:border-blue-600 shadow-sm text-sm font-medium rounded-md text-blue-700 dark:text-blue-200 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isBulkUpdating}
               >
                 {showCapacityFilter ? 'Hide' : 'Show'} Capacity Filter ({excludedCapacities.length} excluded)
               </button>
@@ -801,6 +899,7 @@ export default function OrdersManagement() {
                 type="button"
                 onClick={() => setShowNetworkFilter(!showNetworkFilter)}
                 className="inline-flex justify-center py-2 px-4 border border-purple-300 dark:border-purple-600 shadow-sm text-sm font-medium rounded-md text-purple-700 dark:text-purple-200 bg-purple-50 dark:bg-purple-900 hover:bg-purple-100 dark:hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                disabled={isBulkUpdating}
               >
                 {showNetworkFilter ? 'Hide' : 'Show'} Network Filter ({excludedNetworks.length} excluded)
               </button>
@@ -808,6 +907,7 @@ export default function OrdersManagement() {
                 type="button"
                 onClick={() => setShowNetworkCapacityFilter(!showNetworkCapacityFilter)}
                 className="inline-flex justify-center py-2 px-4 border border-orange-300 dark:border-orange-600 shadow-sm text-sm font-medium rounded-md text-orange-700 dark:text-orange-200 bg-orange-50 dark:bg-orange-900 hover:bg-orange-100 dark:hover:bg-orange-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                disabled={isBulkUpdating}
               >
                 {showNetworkCapacityFilter ? 'Hide' : 'Show'} Network+Capacity Filter ({excludedNetworkCapacities.length} excluded)
               </button>
@@ -830,6 +930,7 @@ export default function OrdersManagement() {
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
                     }`}
+                    disabled={isBulkUpdating}
                   >
                     {capacity}GB
                   </button>
@@ -861,6 +962,7 @@ export default function OrdersManagement() {
                         ? 'bg-purple-600 text-white hover:bg-purple-700'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
                     }`}
+                    disabled={isBulkUpdating}
                   >
                     {network} {excludedNetworks.includes(network) && '✕'}
                   </button>
@@ -900,6 +1002,7 @@ export default function OrdersManagement() {
                                 ? 'bg-orange-600 text-white hover:bg-orange-700'
                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
                             }`}
+                            disabled={isBulkUpdating}
                           >
                             {item.capacity}GB
                           </button>
@@ -955,25 +1058,26 @@ export default function OrdersManagement() {
         </div>
 
         {/* Load More Button */}
-        {serverPage < serverTotalPages && (
+        {serverPage < serverTotalPages && !isBulkUpdating && (
           <div className="mb-4 text-center">
             <button
               onClick={loadMoreOrders}
-              disabled={loading}
+              disabled={pageLoading}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              {loading ? 'Loading...' : `Load More Orders (Page ${serverPage + 1} of ${serverTotalPages})`}
+              {pageLoading ? 'Loading...' : `Load More Orders (Page ${serverPage + 1} of ${serverTotalPages})`}
             </button>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-100 p-4 mb-4" role="alert">
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 dark:bg-red-900 dark:border-red-700 dark:text-red-100 p-4 mb-4 rounded-lg flex items-center" role="alert">
+            <AlertCircle className="h-5 w-5 mr-2" />
             <p>{error}</p>
           </div>
         )}
 
-        {loading && orders.length === 0 ? (
+        {initialLoading && orders.length === 0 ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
@@ -990,6 +1094,7 @@ export default function OrdersManagement() {
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
                           onChange={handleSelectAll}
                           checked={displayedOrders.length > 0 && selectedOrders.length === displayedOrders.length}
+                          disabled={isBulkUpdating}
                         />
                       </div>
                     </th>
@@ -1008,7 +1113,10 @@ export default function OrdersManagement() {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {displayedOrders.length > 0 ? (
                     displayedOrders.map((order) => (
-                      <tr key={order._id} className={selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""}>
+                      <tr 
+                        key={order._id} 
+                        className={`${selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""} ${isBulkUpdating ? "opacity-50" : ""}`}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <input
@@ -1016,6 +1124,7 @@ export default function OrdersManagement() {
                               className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
                               onChange={() => handleOrderSelect(order._id)}
                               checked={selectedOrders.includes(order._id)}
+                              disabled={isBulkUpdating}
                             />
                           </div>
                         </td>
@@ -1100,6 +1209,7 @@ export default function OrdersManagement() {
                               className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
                               value={order.status || ''}
                               onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                              disabled={isBulkUpdating}
                             >
                               <option value="" disabled>Change Status</option>
                               <option value="pending" className="bg-white dark:bg-gray-700">Pending</option>
@@ -1129,7 +1239,7 @@ export default function OrdersManagement() {
         )}
 
         {/* Pagination */}
-        {!loading && filteredOrders.length > 0 && (
+        {!initialLoading && filteredOrders.length > 0 && (
           <div className="bg-white dark:bg-gray-800 px-4 py-3 flex flex-wrap items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 mt-4 rounded-lg shadow">
             <div className="flex-1 flex flex-wrap justify-between">
               <div className="mb-2 sm:mb-0">
@@ -1149,10 +1259,10 @@ export default function OrdersManagement() {
               <div>
                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                   <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1 || isBulkUpdating}
                     className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
-                      currentPage === 1 ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      currentPage === 1 || isBulkUpdating ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
                     }`}
                   >
                     <span className="sr-only">Previous</span>
@@ -1174,12 +1284,13 @@ export default function OrdersManagement() {
                       return (
                         <button
                           key={pageNumber}
-                          onClick={() => setCurrentPage(pageNumber)}
+                          onClick={() => handlePageChange(pageNumber)}
+                          disabled={isBulkUpdating}
                           className={`relative inline-flex items-center px-4 py-2 border ${
                             currentPage === pageNumber
                               ? 'z-10 bg-indigo-50 dark:bg-indigo-900 border-indigo-500 text-indigo-600 dark:text-indigo-200'
                               : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          } text-sm font-medium`}
+                          } text-sm font-medium ${isBulkUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                         >
                           {pageNumber}
                         </button>
@@ -1202,10 +1313,10 @@ export default function OrdersManagement() {
                   })}
                   
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || isBulkUpdating}
                     className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
-                      currentPage === totalPages ? 'text-gray-300 dark:text-gray-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      currentPage === totalPages || isBulkUpdating ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
                     }`}
                   >
                     <span className="sr-only">Next</span>
@@ -1219,6 +1330,23 @@ export default function OrdersManagement() {
           </div>
         )}
       </div>
+      
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
     </AdminLayout>
   );
 }
