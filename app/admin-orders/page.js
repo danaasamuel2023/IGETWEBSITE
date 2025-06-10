@@ -55,6 +55,9 @@ export default function OrdersManagement() {
   const [bulkUpdateProgress, setBulkUpdateProgress] = useState(0);
   const [updateSuccessMessage, setUpdateSuccessMessage] = useState('');
 
+  // Add state to track if we should reset pagination
+  const [shouldResetPagination, setShouldResetPagination] = useState(false);
+
   // Helper function to extract network from bundle type
   const getNetworkFromBundleType = useCallback((bundleType) => {
     if (!bundleType) return 'Unknown';
@@ -131,7 +134,13 @@ export default function OrdersManagement() {
         setServerTotalPages(response.data.pages || 1);
         
         // Apply client-side filtering for immediate response
-        applyClientSideFilters(append ? [...orders, ...newOrders] : newOrders);
+        // Pass shouldResetPagination flag to control page reset
+        applyClientSideFilters(append ? [...orders, ...newOrders] : newOrders, shouldResetPagination);
+        
+        // Reset the flag after use
+        if (shouldResetPagination) {
+          setShouldResetPagination(false);
+        }
         
         console.log(`Fetched ${newOrders.length} orders from server (page ${page}), total: ${response.data.total}`);
       } else {
@@ -154,7 +163,7 @@ export default function OrdersManagement() {
       setInitialLoading(false);
       setPageLoading(false);
     }
-  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities, isBulkUpdating, orders]);
+  }, [filter, searchQuery, excludedCapacities, excludedNetworks, excludedNetworkCapacities, isBulkUpdating, orders, shouldResetPagination]);
 
   // Load all orders for export (paginated in background)
   const loadAllOrdersForExport = useCallback(async () => {
@@ -254,6 +263,7 @@ export default function OrdersManagement() {
 
   // Initial load
   useEffect(() => {
+    setShouldResetPagination(true);
     fetchOrders(1, 100);
   }, []);
 
@@ -261,6 +271,7 @@ export default function OrdersManagement() {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (useServerSearch && searchQuery) {
+        setShouldResetPagination(true);
         fetchOrders(1, 100);
       } else if (!useServerSearch && orders.length > 0) {
         applyClientSideFilters(orders, true);
@@ -273,9 +284,10 @@ export default function OrdersManagement() {
   // Apply filters - always fetches from server
   useEffect(() => {
     if (!isBulkUpdating) {
+      setShouldResetPagination(true);
       fetchOrders(1, 100);
     }
-  }, [filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities, fetchOrders, isBulkUpdating]);
+  }, [filter, excludedCapacities, excludedNetworks, excludedNetworkCapacities]);
 
   // Define the standard capacities
   const STANDARD_CAPACITIES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100];
@@ -329,9 +341,13 @@ export default function OrdersManagement() {
     setDisplayedOrders(paginatedResult);
   }, [filteredOrders, currentPage, itemsPerPage]);
 
-  // Pagination handler
+  // Pagination handler - Fixed to prevent page reset
   const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      setCurrentPage(newPage);
+      // Scroll to top of table
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // Clear success message after 5 seconds
@@ -521,6 +537,7 @@ export default function OrdersManagement() {
 
   const handleFilterSubmit = (e) => {
     e.preventDefault();
+    setShouldResetPagination(true);
     fetchOrders(1, 100);
   };
 
@@ -541,6 +558,7 @@ export default function OrdersManagement() {
     setExcludedCapacities([]);
     setExcludedNetworks([]);
     setExcludedNetworkCapacities([]);
+    setShouldResetPagination(true);
   };
 
   const formatDate = (dateString) => {
