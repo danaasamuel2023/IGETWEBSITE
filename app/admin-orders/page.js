@@ -4,7 +4,7 @@ import axios from 'axios';
 import Head from 'next/head';
 import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
-import { Phone, User, Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { Phone, User, Search, AlertCircle, CheckCircle, RefreshCw, ExternalLink } from 'lucide-react';
 
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
@@ -48,7 +48,7 @@ export default function OrdersManagement() {
   const [loadAllForExport, setLoadAllForExport] = useState(false);
   const [serverPage, setServerPage] = useState(1);
   const [serverTotalPages, setServerTotalPages] = useState(1);
-  const [useServerSearch, setUseServerSearch] = useState(true); // Toggle for search mode
+  const [useServerSearch, setUseServerSearch] = useState(true);
 
   // New states for optimized bulk updates
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
@@ -57,6 +57,11 @@ export default function OrdersManagement() {
 
   // Add state to track if we should reset pagination
   const [shouldResetPagination, setShouldResetPagination] = useState(false);
+
+  // New states for external status checking
+  const [externalStatuses, setExternalStatuses] = useState({});
+  const [checkingStatuses, setCheckingStatuses] = useState({});
+  const [lastCheckedTimes, setLastCheckedTimes] = useState({});
 
   // Helper function to extract network from bundle type
   const getNetworkFromBundleType = useCallback((bundleType) => {
@@ -72,6 +77,91 @@ export default function OrdersManagement() {
     
     return networkMap[bundleType] || 'Unknown';
   }, []);
+
+  // Function to check external status for mtnup2u orders
+  const checkExternalStatus = async (order) => {
+    if (!order.orderReference || order.bundleType?.toLowerCase() !== 'mtnup2u') {
+      return;
+    }
+
+    setCheckingStatuses(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const response = await fetch(`https://console.hubnet.app/live/api/context/business/transaction-checker?reference=${order.orderReference}`, {
+        method: 'GET',
+        headers: {
+          'token': 'Bearer biWUr20SFfp8W33BRThwqTkg2PhoaZTkeWx',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success' && result.data) {
+        setExternalStatuses(prev => ({
+          ...prev,
+          [order._id]: {
+            status: result.data.status,
+            processedDate: result.data.processed_date,
+            volume: result.data.volume,
+            number: result.data.number,
+            responseCode: result.data.response_code,
+            message: result.data.message
+          }
+        }));
+        setLastCheckedTimes(prev => ({
+          ...prev,
+          [order._id]: new Date().toISOString()
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking external status:', error);
+    } finally {
+      setCheckingStatuses(prev => ({ ...prev, [order._id]: false }));
+    }
+  };
+
+  // Bulk check external statuses for all visible mtnup2u orders
+  const checkAllMtnUp2uStatuses = async () => {
+    const mtnUp2uOrders = displayedOrders.filter(order => order.bundleType?.toLowerCase() === 'mtnup2u');
+    
+    for (const order of mtnUp2uOrders) {
+      await checkExternalStatus(order);
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  };
+
+  // Auto-check external status when orders are displayed
+  useEffect(() => {
+    const mtnUp2uOrders = displayedOrders.filter(order => 
+      order.bundleType?.toLowerCase() === 'mtnup2u' && 
+      !externalStatuses[order._id] && 
+      !checkingStatuses[order._id]
+    );
+
+    if (mtnUp2uOrders.length > 0) {
+      mtnUp2uOrders.forEach(order => {
+        checkExternalStatus(order);
+      });
+    }
+  }, [displayedOrders]);
+
+  // Get display status (external or internal)
+  const getDisplayStatus = (order) => {
+    const external = externalStatuses[order._id];
+    if (external?.status) {
+      // Map external status to internal status format if needed
+      const statusMap = {
+        'delivered': 'completed',
+        'pending': 'pending',
+        'failed': 'failed',
+        'processing': 'processing'
+      };
+      return statusMap[external.status.toLowerCase()] || external.status;
+    }
+    return order.status;
+  };
 
   // Main fetch function that always searches server-side
   const fetchOrders = useCallback(async (page = 1, limit = 100, append = false) => {
@@ -102,17 +192,6 @@ export default function OrdersManagement() {
       // Remove undefined values
       Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
       
-      // Debug log
-      console.log('Fetching orders with params:', params);
-      if (params.startDate || params.endDate) {
-        console.log('Date filter active:', {
-          startDate: params.startDate,
-          endDate: params.endDate,
-          startDateObj: params.startDate ? new Date(params.startDate) : null,
-          endDateObj: params.endDate ? new Date(params.endDate) : null
-        });
-      }
-      
       const response = await axios.get(`https://iget.onrender.com/api/orders/all`, {
         params,
         headers: {
@@ -134,15 +213,12 @@ export default function OrdersManagement() {
         setServerTotalPages(response.data.pages || 1);
         
         // Apply client-side filtering for immediate response
-        // Pass shouldResetPagination flag to control page reset
         applyClientSideFilters(append ? [...orders, ...newOrders] : newOrders, shouldResetPagination);
         
         // Reset the flag after use
         if (shouldResetPagination) {
           setShouldResetPagination(false);
         }
-        
-        console.log(`Fetched ${newOrders.length} orders from server (page ${page}), total: ${response.data.total}`);
       } else {
         if (!append) {
           setOrders([]);
@@ -199,9 +275,6 @@ export default function OrdersManagement() {
           } else {
             page++;
           }
-          
-          // Update progress
-          console.log(`Export: Loaded ${allOrders.length} of ${response.data.total} orders`);
         } else {
           hasMore = false;
         }
@@ -221,7 +294,6 @@ export default function OrdersManagement() {
     let result = [...ordersToFilter];
     
     // Only apply client-side filters if we're working with loaded data
-    // Server-side search handles these when fetching
     if (!useServerSearch && searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
       
@@ -257,8 +329,6 @@ export default function OrdersManagement() {
     if (resetPage) {
       setCurrentPage(1);
     }
-    
-    console.log(`Client-side filtered: ${result.length} orders`);
   }, [searchQuery, itemsPerPage, useServerSearch]);
 
   // Initial load
@@ -276,7 +346,7 @@ export default function OrdersManagement() {
       } else if (!useServerSearch && orders.length > 0) {
         applyClientSideFilters(orders, true);
       }
-    }, 500); // 500ms delay for server search
+    }, 500);
     
     return () => clearTimeout(timer);
   }, [searchQuery, useServerSearch]);
@@ -341,11 +411,10 @@ export default function OrdersManagement() {
     setDisplayedOrders(paginatedResult);
   }, [filteredOrders, currentPage, itemsPerPage]);
 
-  // Pagination handler - Fixed to prevent page reset
+  // Pagination handler
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      // Scroll to top of table
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -363,7 +432,7 @@ export default function OrdersManagement() {
   // Handlers
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(1);
   };
 
   const clearSearch = () => {
@@ -433,14 +502,13 @@ export default function OrdersManagement() {
       setError(null);
       setBulkUpdateProgress(0);
       
-      // Use the new bulk endpoint
       const response = await axios.put(
         'https://iget.onrender.com/api/orders/bulk-status',
         {
           orderIds: selectedOrders,
           status: newStatus,
           senderID: senderID,
-          sendSMSNotification: true // Can be made configurable
+          sendSMSNotification: true
         },
         {
           headers: {
@@ -480,9 +548,6 @@ export default function OrdersManagement() {
           `Successfully updated ${response.data.data.modified} orders to ${newStatus}`
         );
         
-        // Log detailed results
-        console.log('Bulk update results:', response.data.data);
-        
         // Re-apply filters on existing data without server fetch
         applyClientSideFilters(orders, false);
       }
@@ -516,7 +581,6 @@ export default function OrdersManagement() {
 
   const handleSelectAllFiltered = async () => {
     try {
-      // Load all filtered orders from server
       const allFilteredOrders = await loadAllOrdersForExport();
       const orderIds = allFilteredOrders.map(order => order._id);
       
@@ -573,6 +637,7 @@ export default function OrdersManagement() {
       case 'processing':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100';
       case 'completed':
+      case 'delivered':
         return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
       case 'failed':
         return 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100';
@@ -618,10 +683,8 @@ export default function OrdersManagement() {
       let ordersToExport;
       
       if (selectedOrders.length > 0) {
-        // Export only selected orders from current view
         ordersToExport = orders.filter(order => selectedOrders.includes(order._id));
       } else {
-        // Export ALL filtered orders from server
         ordersToExport = await loadAllOrdersForExport();
       }
       
@@ -629,7 +692,10 @@ export default function OrdersManagement() {
         'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
         'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
         'Network': getNetworkFromBundleType(order.bundleType),
-        'Bundle Type': order.bundleType || 'N/A'
+        'Bundle Type': order.bundleType || 'N/A',
+        'Status': getDisplayStatus(order),
+        'External Status': externalStatuses[order._id]?.status || 'N/A',
+        'Order Reference': order.orderReference || 'N/A'
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -639,6 +705,9 @@ export default function OrdersManagement() {
       const maxWidth = excelData.reduce((w, r) => Math.max(w, r['Recipient Number'].length), 10);
       const wscols = [
         { wch: maxWidth },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 20 },
         { wch: 12 },
         { wch: 15 },
         { wch: 20 }
@@ -714,6 +783,14 @@ export default function OrdersManagement() {
                 maxLength="11"
               />
             </div>
+            
+            <button
+              onClick={checkAllMtnUp2uStatuses}
+              className="inline-flex items-center px-3 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Check MTN Statuses
+            </button>
             
             {selectedOrders.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -1130,117 +1207,171 @@ export default function OrdersManagement() {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {displayedOrders.length > 0 ? (
-                    displayedOrders.map((order) => (
-                      <tr 
-                        key={order._id} 
-                        className={`${selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""} ${isBulkUpdating ? "opacity-50" : ""}`}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
-                              onChange={() => handleOrderSelect(order._id)}
-                              checked={selectedOrders.includes(order._id)}
-                              disabled={isBulkUpdating}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          {order.orderReference || order._id.substring(0, 8) + '...'}
-                        </td>
-                        
-                        {/* Special display for AfA-registration bundle type */}
-                        {order.bundleType === 'AfA-registration' ? (
-                          <>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <User className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {order.metadata?.fullName || order.user?.username || 'N/A'}
+                    displayedOrders.map((order) => {
+                      const displayStatus = getDisplayStatus(order);
+                      const externalStatus = externalStatuses[order._id];
+                      const isChecking = checkingStatuses[order._id];
+                      
+                      return (
+                        <tr 
+                          key={order._id} 
+                          className={`${selectedOrders.includes(order._id) ? "bg-indigo-50 dark:bg-indigo-900" : ""} ${isBulkUpdating ? "opacity-50" : ""}`}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
+                                onChange={() => handleOrderSelect(order._id)}
+                                checked={selectedOrders.includes(order._id)}
+                                disabled={isBulkUpdating}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {order.orderReference || order._id.substring(0, 8) + '...'}
+                          </td>
+                          
+                          {/* Special display for AfA-registration bundle type */}
+                          {order.bundleType === 'AfA-registration' ? (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
+                                  <div className="text-sm text-gray-900 dark:text-white">
+                                    {order.phoneNumber || order.recipientNumber || order.user?.phone || 'N/A'}
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700">
-                                {getNetworkFromBundleType(order.bundleType)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.bundleType}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
-                                <div className="text-sm text-gray-900 dark:text-white">
-                                  {order.phoneNumber || order.recipientNumber || order.user?.phone || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                -
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                  getNetworkFromBundleType(order.bundleType) === 'MTN' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
+                                  getNetworkFromBundleType(order.bundleType) === 'AirtelTigo' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
+                                  getNetworkFromBundleType(order.bundleType) === 'Telecel' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' :
+                                  'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
+                                }`}>
+                                  {getNetworkFromBundleType(order.bundleType)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {order.bundleType}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <div className="flex flex-col">
+                                  <span>{order.recipientNumber || 'N/A'}</span>
+                                  {externalStatus?.number && externalStatus.number !== order.recipientNumber && (
+                                    <span className="text-xs text-orange-600 dark:text-orange-400">
+                                      External: {externalStatus.number}
+                                    </span>
+                                  )}
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              -
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{order.user?.username || 'N/A'}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.email || 'N/A'}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{order.user?.phone || 'N/A'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              <span className={`px-2 py-1 text-xs font-medium rounded ${
-                                getNetworkFromBundleType(order.bundleType) === 'MTN' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
-                                getNetworkFromBundleType(order.bundleType) === 'AirtelTigo' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
-                                getNetworkFromBundleType(order.bundleType) === 'Telecel' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' :
-                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
-                              }`}>
-                                {getNetworkFromBundleType(order.bundleType)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <div className="flex flex-col">
+                                  <span>{order.capacity ? order.capacity : 'N/A'} GB</span>
+                                  {externalStatus?.volume && (
+                                    <span className="text-xs text-green-600 dark:text-green-400">
+                                      External: {externalStatus.volume}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            </>
+                          )}
+                          
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            ₵{order.price?.toFixed(2) || '0.00'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex flex-col">
+                              <span>{formatDate(order.createdAt)}</span>
+                              {externalStatus?.processedDate && (
+                                <span className="text-xs text-purple-600 dark:text-purple-400">
+                                  Processed: {externalStatus.processedDate}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(displayStatus)}`}>
+                                {displayStatus}
                               </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.bundleType}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.recipientNumber || 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {order.capacity ? order.capacity : 'N/A'} GB
-                            </td>
-                          </>
-                        )}
-                        
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          ₵{order.price?.toFixed(2) || '0.00'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatDate(order.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(order.status)}`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-col space-y-2">
-                            <select 
-                              className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
-                              value={order.status || ''}
-                              onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                              disabled={isBulkUpdating}
-                            >
-                              <option value="" disabled>Change Status</option>
-                              <option value="pending" className="bg-white dark:bg-gray-700">Pending</option>
-                              <option value="processing" className="bg-white dark:bg-gray-700">Processing</option>
-                              <option value="completed" className="bg-white dark:bg-gray-700">Completed</option>
-                              <option value="failed" className="bg-white dark:bg-gray-700">Failed</option>
-                              <option value="refunded" className="bg-white dark:bg-gray-700">Refunded</option>
-                            </select>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">SMS: {senderID}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {externalStatus && (
+                                <div className="flex items-center space-x-1">
+                                  <ExternalLink className="h-3 w-3 text-green-500" title="External status verified" />
+                                  {lastCheckedTimes[order._id] && (
+                                    <span className="text-xs text-gray-400" title={`Last checked: ${new Date(lastCheckedTimes[order._id]).toLocaleString()}`}>
+                                      ✓
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {isChecking && (
+                                <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
+                              )}
+                            </div>
+                            {externalStatus?.message && externalStatus.message !== 'match found' && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {externalStatus.message}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col space-y-2">
+                              <select 
+                                className="text-sm text-indigo-600 dark:text-indigo-400 bg-transparent border border-indigo-300 dark:border-indigo-700 rounded-md p-1"
+                                value={order.status || ''}
+                                onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                                disabled={isBulkUpdating}
+                              >
+                                <option value="" disabled>Change Status</option>
+                                <option value="pending" className="bg-white dark:bg-gray-700">Pending</option>
+                                <option value="processing" className="bg-white dark:bg-gray-700">Processing</option>
+                                <option value="completed" className="bg-white dark:bg-gray-700">Completed</option>
+                                <option value="failed" className="bg-white dark:bg-gray-700">Failed</option>
+                                <option value="refunded" className="bg-white dark:bg-gray-700">Refunded</option>
+                              </select>
+                              {order.bundleType?.toLowerCase() === 'mtnup2u' && (
+                                <button
+                                  onClick={() => checkExternalStatus(order)}
+                                  disabled={isChecking}
+                                  className={`text-xs px-2 py-1 rounded flex items-center justify-center ${
+                                    isChecking 
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                      : 'bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-200'
+                                  }`}
+                                >
+                                  {isChecking ? (
+                                    <>
+                                      <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                                      Checking...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ExternalLink className="h-3 w-3 mr-1" />
+                                      Check Status
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              <span className="text-xs text-gray-500 dark:text-gray-400">SMS: {senderID}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan="11" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -1368,3 +1499,4 @@ export default function OrdersManagement() {
     </AdminLayout>
   );
 }
+                               

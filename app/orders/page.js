@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Head from 'next/head';
-import { Package, AlertCircle, ChevronLeft, RefreshCw, Search, Moon, Sun } from 'lucide-react';
+import { Package, AlertCircle, ChevronLeft, RefreshCw, Search, Moon, Sun, CheckCircle } from 'lucide-react';
 
 // UserOrders component
 export default function UserOrders() {
@@ -13,15 +13,15 @@ export default function UserOrders() {
   const [error, setError] = useState(null);
   const [searchPhone, setSearchPhone] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [statusUpdates, setStatusUpdates] = useState({});
+  const [checkingStatus, setCheckingStatus] = useState({});
 
   // Check user's preferred color scheme on component mount
   useEffect(() => {
-    // Check if user prefers dark mode or has set it in localStorage
     const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedMode = localStorage.getItem('darkMode');
     setIsDarkMode(savedMode === 'true' || (savedMode === null && userPrefersDark));
     
-    // Apply dark mode class to document if needed
     if (savedMode === 'true' || (savedMode === null && userPrefersDark)) {
       document.documentElement.classList.add('dark');
     }
@@ -60,12 +60,57 @@ export default function UserOrders() {
     }
   }, [searchPhone, orders]);
 
+  // Check external status for mtnup2u orders
+  const checkExternalStatus = async (order) => {
+    if (!order.orderReference || order.bundleType?.toLowerCase() !== 'mtnup2u') {
+      return;
+    }
+
+    setCheckingStatus(prev => ({ ...prev, [order._id]: true }));
+
+    try {
+      const response = await fetch(`https://console.hubnet.app/live/api/context/business/transaction-checker?reference=${order.orderReference}`, {
+        method: 'GET',
+        headers: {
+          'token': 'Bearer biWUr20SFfp8W33BRThwqTkg2PhoaZTkeWx',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success' && result.data) {
+        setStatusUpdates(prev => ({
+          ...prev,
+          [order._id]: {
+            status: result.data.status,
+            processedDate: result.data.processed_date,
+            volume: result.data.volume,
+            externalCheck: true
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking external status:', error);
+    } finally {
+      setCheckingStatus(prev => ({ ...prev, [order._id]: false }));
+    }
+  };
+
+  // Automatically check status for mtnup2u orders on load
+  useEffect(() => {
+    orders.forEach(order => {
+      if (order.bundleType?.toLowerCase() === 'mtnup2u' && !statusUpdates[order._id]) {
+        checkExternalStatus(order);
+      }
+    });
+  }, [orders]);
+
   const fetchOrders = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Get token from localStorage
       const token = localStorage.getItem('igettoken');
       
       if (!token) {
@@ -101,34 +146,43 @@ export default function UserOrders() {
     return new Date(dateString).toLocaleDateString('en-US', options);
   };
 
+  const getOrderStatus = (order) => {
+    const externalStatus = statusUpdates[order._id];
+    if (externalStatus?.status) {
+      return externalStatus.status;
+    }
+    return order.status || 'Unknown';
+  };
+
   const getStatusColor = (status) => {
     const statusLower = status?.toLowerCase();
     
-    // Light mode colors
     if (!isDarkMode) {
       switch (statusLower) {
         case 'completed':
+        case 'delivered':
           return 'bg-green-100 text-green-800';
         case 'pending':
           return 'bg-yellow-100 text-yellow-800';
         case 'processing':
           return 'bg-blue-100 text-blue-800';
         case 'cancelled':
+        case 'failed':
           return 'bg-red-100 text-red-800';
         default:
           return 'bg-gray-100 text-gray-800';
       }
-    } 
-    // Dark mode colors
-    else {
+    } else {
       switch (statusLower) {
         case 'completed':
+        case 'delivered':
           return 'bg-green-900 text-green-100';
         case 'pending':
           return 'bg-yellow-900 text-yellow-100';
         case 'processing':
           return 'bg-blue-900 text-blue-100';
         case 'cancelled':
+        case 'failed':
           return 'bg-red-900 text-red-100';
         default:
           return 'bg-gray-700 text-gray-100';
@@ -136,14 +190,17 @@ export default function UserOrders() {
     }
   };
 
-  // Handle search input changes
   const handleSearchChange = (e) => {
     setSearchPhone(e.target.value);
   };
 
-  // Clear search
   const clearSearch = () => {
     setSearchPhone('');
+  };
+
+  const refreshAllStatuses = async () => {
+    setStatusUpdates({});
+    await fetchOrders();
   };
 
   return (
@@ -177,7 +234,7 @@ export default function UserOrders() {
             </button>
             
             <button 
-              onClick={fetchOrders} 
+              onClick={refreshAllStatuses} 
               className={`flex items-center ${
                 isDarkMode 
                   ? 'bg-blue-700 hover:bg-blue-800' 
@@ -292,40 +349,79 @@ export default function UserOrders() {
                     <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
                       Date
                     </th>
+                    <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                  {filteredOrders.map((order) => (
-                    <tr key={order._id} className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                        {order.orderReference}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                          {order.capacity ? `${order.capacity} GB` : 'N/A'} 
-                          {order.bundleType && ` (${order.bundleType})`}
-                        </div>
-                        {order.recipientNumber && (
-                          <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {order.recipientNumber}
+                  {filteredOrders.map((order) => {
+                    const currentStatus = getOrderStatus(order);
+                    const statusUpdate = statusUpdates[order._id];
+                    const isChecking = checkingStatus[order._id];
+                    
+                    return (
+                      <tr key={order._id} className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                          {order.orderReference}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                            {statusUpdate?.volume || (order.capacity ? `${order.capacity} GB` : 'N/A')} 
+                            {order.bundleType && ` (${order.bundleType})`}
                           </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-                          GH¢ {order.price || 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {formatDate(order.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
+                          {order.recipientNumber && (
+                            <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {order.recipientNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`text-sm font-medium ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                            GH¢ {order.price || 'N/A'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(currentStatus)}`}>
+                              {currentStatus}
+                            </span>
+                            {statusUpdate?.externalCheck && (
+                              <CheckCircle size={16} className="text-green-500" title="Verified externally" />
+                            )}
+                            {isChecking && (
+                              <RefreshCw size={16} className="animate-spin text-blue-500" />
+                            )}
+                          </div>
+                        </td>
+                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          <div>
+                            {statusUpdate?.processedDate || formatDate(order.createdAt)}
+                          </div>
+                          {statusUpdate?.processedDate && (
+                            <div className="text-xs italic">
+                              Originally: {formatDate(order.createdAt)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {order.bundleType?.toLowerCase() === 'mtnup2u' && (
+                            <button
+                              onClick={() => checkExternalStatus(order)}
+                              disabled={isChecking}
+                              className={`text-xs px-2 py-1 rounded ${
+                                isDarkMode 
+                                  ? 'bg-blue-700 hover:bg-blue-800 text-white' 
+                                  : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                              } ${isChecking ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {isChecking ? 'Checking...' : 'Check Status'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -337,6 +433,10 @@ export default function UserOrders() {
                 ) : (
                   <>Showing {orders.length} order{orders.length !== 1 ? 's' : ''}</>
                 )}
+              </p>
+              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <CheckCircle size={12} className="inline mr-1" />
+                Orders with this icon have been verified externally
               </p>
             </div>
           </div>
