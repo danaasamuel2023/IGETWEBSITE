@@ -307,6 +307,12 @@ export default function OrdersManagement() {
         const referenceCheck = order.orderReference?.toLowerCase().includes(query);
         if (referenceCheck) return true;
         
+        // Add search for AFA registration names
+        if (order.bundleType === 'AfA-registration' && order.metadata?.fullName) {
+          const nameCheck = order.metadata.fullName.toLowerCase().includes(query);
+          if (nameCheck) return true;
+        }
+        
         const otherFields = [
           order._id,
           order.user?.username,
@@ -689,7 +695,8 @@ export default function OrdersManagement() {
       }
       
       const excelData = ordersToExport.map(order => ({
-        'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A', 
+        'Recipient Number': order.recipientNumber || order.phoneNumber || 'N/A',
+        'Name': order.bundleType === 'AfA-registration' ? (order.metadata?.fullName || 'N/A') : (order.user?.username || 'N/A'),
         'Capacity (GB)': order.capacity ? (order.capacity).toFixed(1) : 0,
         'Network': getNetworkFromBundleType(order.bundleType),
         'Bundle Type': order.bundleType || 'N/A',
@@ -705,6 +712,7 @@ export default function OrdersManagement() {
       const maxWidth = excelData.reduce((w, r) => Math.max(w, r['Recipient Number'].length), 10);
       const wscols = [
         { wch: maxWidth },
+        { wch: 20 },
         { wch: 12 },
         { wch: 15 },
         { wch: 20 },
@@ -848,7 +856,7 @@ export default function OrdersManagement() {
             </div>
             <input
               type="text"
-              placeholder="Search by ID, username, email, phone, recipient number, or order reference..."
+              placeholder="Search by ID, username, email, phone, recipient number, order reference, or name (for AFA)..."
               className="pl-10 pr-10 py-2 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white sm:text-sm"
               value={searchQuery}
               onChange={handleSearchChange}
@@ -1194,7 +1202,7 @@ export default function OrdersManagement() {
                       </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Order ID</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User/Name</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Network</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Bundle Type</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recipient</th>
@@ -1237,11 +1245,27 @@ export default function OrdersManagement() {
                             <>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
-                                  <div className="text-sm text-gray-900 dark:text-white">
-                                    {order.phoneNumber || order.recipientNumber || order.user?.phone || 'N/A'}
+                                  <User className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-2" />
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {order.metadata?.fullName || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {order.phoneNumber || order.recipientNumber || 'N/A'}
+                                    </div>
                                   </div>
                                 </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <span className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                                  AfA
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {order.bundleType}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {order.recipientNumber || order.phoneNumber || 'N/A'}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 -
@@ -1499,4 +1523,3 @@ export default function OrdersManagement() {
     </AdminLayout>
   );
 }
-                               

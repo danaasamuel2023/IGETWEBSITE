@@ -119,7 +119,7 @@ export default function AFARegistrationsPage() {
     try {
       setLoading(true);
       
-      const response = await axios.put(`http://localhost:5000/api/afa/registrations/${registrationId}/status`, {
+      const response = await axios.put(`https://iget.onrender.com/api/afa/registrations/${registrationId}/status`, {
         status: newStatus
       }, {
         headers: {
@@ -155,7 +155,7 @@ export default function AFARegistrationsPage() {
       setLoading(true);
       
       const updatePromises = selectedRegistrations.map(regId => 
-        axios.put(`http://localhost:5000/api/afa/registrations/${regId}/status`, {
+        axios.put(`https://iget.onrender.com/api/afa/registrations/${regId}/status`, {
           status: bulkStatus
         }, {
           headers: {
