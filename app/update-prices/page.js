@@ -14,7 +14,13 @@ import {
   ChevronUp,
   Package,
   PackageX,
-  Info
+  Info,
+  Plus,
+  Minus,
+  TrendingDown,
+  BarChart3,
+  History,
+  Settings
 } from 'lucide-react';
 import axios from 'axios';
 import AdminLayout from '@/components/adminWraper';
@@ -33,10 +39,18 @@ const BundlePriceList = () => {
     agent: '',
     Editor: ''
   });
+  const [stockData, setStockData] = useState({
+    available: '',
+    lowThreshold: '',
+    adjustment: '',
+    adjustmentReason: ''
+  });
   const [updateLoading, setUpdateLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [expandedBundle, setExpandedBundle] = useState(null);
   const [stockUpdateLoading, setStockUpdateLoading] = useState({});
+  const [showStockHistory, setShowStockHistory] = useState(null);
+  const [stockHistory, setStockHistory] = useState({});
   
   const bundleTypes = [
     'mtnup2u',
@@ -75,7 +89,7 @@ const BundlePriceList = () => {
         })
         .catch(err => {
           console.error(`Error fetching ${type} bundles:`, err);
-          results[type] = []; // Set empty array for failed requests
+          results[type] = [];
         })
       );
       
@@ -87,6 +101,133 @@ const BundlePriceList = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const fetchStockHistory = async (bundleId) => {
+    try {
+      const token = localStorage.getItem('igettoken');
+      const response = await axios.get(
+        `https://iget.onrender.com/api/iget/stock/${bundleId}/history`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setStockHistory(prev => ({
+        ...prev,
+        [bundleId]: response.data.data
+      }));
+      setShowStockHistory(bundleId);
+    } catch (err) {
+      setError('Failed to fetch stock history');
+    }
+  };
+
+  const updateStock = async (bundleId, bundleType, action) => {
+    setStockUpdateLoading(prev => ({ ...prev, [`${bundleId}_${action}`]: true }));
+    
+    try {
+      const token = localStorage.getItem('igettoken');
+      let endpoint = '';
+      let requestBody = {};
+      
+      switch(action) {
+        case 'restock':
+          if (!stockData.adjustment || parseInt(stockData.adjustment) <= 0) {
+            setError('Please enter a valid restock amount');
+            return;
+          }
+          endpoint = `/api/iget/stock/${bundleId}/restock`;
+          requestBody = {
+            units: parseInt(stockData.adjustment),
+            reason: stockData.adjustmentReason || 'Manual restock'
+          };
+          break;
+          
+        case 'adjust':
+          if (!stockData.adjustment || parseInt(stockData.adjustment) === 0) {
+            setError('Please enter a valid adjustment amount');
+            return;
+          }
+          endpoint = `/api/iget/stock/${bundleId}/adjust`;
+          requestBody = {
+            adjustment: parseInt(stockData.adjustment),
+            reason: stockData.adjustmentReason || 'Manual adjustment'
+          };
+          break;
+          
+        case 'set':
+          if (!stockData.available || parseInt(stockData.available) < 0) {
+            setError('Please enter a valid stock amount');
+            return;
+          }
+          endpoint = `/api/iget/stock/${bundleId}/set`;
+          requestBody = {
+            units: parseInt(stockData.available),
+            reason: stockData.adjustmentReason || 'Stock level set'
+          };
+          break;
+          
+        case 'threshold':
+          if (!stockData.lowThreshold || parseInt(stockData.lowThreshold) < 0) {
+            setError('Please enter a valid threshold');
+            return;
+          }
+          endpoint = `/api/iget/stock/${bundleId}/low-threshold`;
+          requestBody = {
+            threshold: parseInt(stockData.lowThreshold)
+          };
+          break;
+      }
+      
+      const response = await axios.put(
+        `https://iget.onrender.com${endpoint}`,
+        requestBody,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      // Update local state with new stock data
+      if (response.data.success) {
+        setBundleData(prevData => {
+          const updatedBundles = [...(prevData[bundleType] || [])];
+          const bundleIndex = updatedBundles.findIndex(b => b._id === bundleId);
+          
+          if (bundleIndex !== -1 && response.data.data) {
+            updatedBundles[bundleIndex] = {
+              ...updatedBundles[bundleIndex],
+              stockUnits: response.data.data.stockUnits || updatedBundles[bundleIndex].stockUnits,
+              stockInfo: {
+                ...updatedBundles[bundleIndex].stockInfo,
+                available: response.data.data.newStock || response.data.data.currentStock?.available,
+                isLowStock: response.data.data.isLowStock,
+                stockPercentage: response.data.data.stockPercentage
+              }
+            };
+          }
+          
+          return {
+            ...prevData,
+            [bundleType]: updatedBundles
+          };
+        });
+        
+        setSuccessMessage(response.data.message || 'Stock updated successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        
+        // Clear adjustment fields after successful update
+        setStockData(prev => ({
+          ...prev,
+          adjustment: '',
+          adjustmentReason: ''
+        }));
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || `Failed to ${action} stock`);
+    } finally {
+      setStockUpdateLoading(prev => ({ ...prev, [`${bundleId}_${action}`]: false }));
     }
   };
 
@@ -173,6 +314,14 @@ const BundlePriceList = () => {
       agent: bundle.rolePricing?.agent?.toString() || bundle.price.toString(),
       Editor: bundle.rolePricing?.Editor?.toString() || bundle.price.toString()
     });
+    
+    // Initialize stock data
+    setStockData({
+      available: bundle.stockInfo?.available?.toString() || '0',
+      lowThreshold: bundle.stockInfo?.lowStockThreshold?.toString() || '10',
+      adjustment: '',
+      adjustmentReason: ''
+    });
   };
   
   const cancelEditing = () => {
@@ -183,6 +332,12 @@ const BundlePriceList = () => {
       user: '',
       agent: '',
       Editor: ''
+    });
+    setStockData({
+      available: '',
+      lowThreshold: '',
+      adjustment: '',
+      adjustmentReason: ''
     });
   };
   
@@ -249,6 +404,39 @@ const BundlePriceList = () => {
     } finally {
       setUpdateLoading(false);
     }
+  };
+
+  const getStockStatusBadge = (bundle) => {
+    const available = bundle.stockInfo?.available || 0;
+    const isLowStock = bundle.stockStatus?.isLowStock || bundle.stockInfo?.isLowStock;
+    const percentage = bundle.stockPercentage || bundle.stockInfo?.stockPercentage || 0;
+    
+    if (available === 0) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 dark:bg-red-900/20 dark:text-red-400 rounded-full">
+          Out of Stock
+        </span>
+      );
+    }
+    if (percentage < 20) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold text-orange-800 bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 rounded-full">
+          Critical ({available})
+        </span>
+      );
+    }
+    if (isLowStock) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full">
+          Low Stock ({available})
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 dark:bg-green-900/20 dark:text-green-400 rounded-full">
+        In Stock ({available})
+      </span>
+    );
   };
 
   if (loading && !refreshing) {
@@ -343,14 +531,11 @@ const BundlePriceList = () => {
                 <div className="p-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {bundles.map((bundle) => {
-                      const isInStock = bundle.stockInfo?.isOutOfStock === false || 
-                                      (bundle.isInStock !== false && !bundle.stockInfo?.isOutOfStock);
-                      
                       return (
                         <div 
                           key={bundle._id}
                           className={`bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border-2 ${
-                            isInStock 
+                            (bundle.stockInfo?.available || 0) > 0 
                               ? 'border-transparent' 
                               : 'border-red-300 dark:border-red-700'
                           }`}
@@ -364,7 +549,9 @@ const BundlePriceList = () => {
                                 </span>
                               </div>
                               
-                              <div className="space-y-2">
+                              {/* Price editing section */}
+                              <div className="space-y-2 border-b pb-3 dark:border-gray-600">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Pricing</h4>
                                 {/* Standard price edit */}
                                 <div className="flex items-center">
                                   <span className="text-gray-700 dark:text-gray-300 mr-2 w-20 text-sm">Standard:</span>
@@ -402,6 +589,100 @@ const BundlePriceList = () => {
                                 ))}
                               </div>
                               
+                              {/* Stock management section */}
+                              <div className="space-y-2 border-b pb-3 dark:border-gray-600">
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Stock Management</h4>
+                                
+                                {/* Current stock display */}
+                                <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-xs">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <span className="text-gray-600 dark:text-gray-400">Current:</span>
+                                      <span className="font-semibold ml-1">{bundle.stockInfo?.available || 0}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600 dark:text-gray-400">Reserved:</span>
+                                      <span className="font-semibold ml-1">{bundle.stockInfo?.reserved || 0}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600 dark:text-gray-400">Sold:</span>
+                                      <span className="font-semibold ml-1">{bundle.stockInfo?.sold || 0}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600 dark:text-gray-400">Threshold:</span>
+                                      <span className="font-semibold ml-1">{bundle.stockInfo?.lowStockThreshold || 10}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Stock adjustment */}
+                                <div className="space-y-2">
+                                  <input
+                                    type="number"
+                                    placeholder="Add/subtract units (e.g., 50 or -20)"
+                                    value={stockData.adjustment}
+                                    onChange={(e) => setStockData(prev => ({ ...prev, adjustment: e.target.value }))}
+                                    className="w-full p-1 border rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-sm"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="Reason for adjustment"
+                                    value={stockData.adjustmentReason}
+                                    onChange={(e) => setStockData(prev => ({ ...prev, adjustmentReason: e.target.value }))}
+                                    className="w-full p-1 border rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-sm"
+                                  />
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => updateStock(bundle._id, type, 'restock')}
+                                      disabled={stockUpdateLoading[`${bundle._id}_restock`] || !stockData.adjustment || parseInt(stockData.adjustment) <= 0}
+                                      className="flex-1 p-1 text-xs bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                                    >
+                                      {stockUpdateLoading[`${bundle._id}_restock`] ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Plus className="w-3 h-3" />
+                                      )}
+                                      Restock
+                                    </button>
+                                    <button
+                                      onClick={() => updateStock(bundle._id, type, 'adjust')}
+                                      disabled={stockUpdateLoading[`${bundle._id}_adjust`] || !stockData.adjustment || parseInt(stockData.adjustment) === 0}
+                                      className="flex-1 p-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                                    >
+                                      {stockUpdateLoading[`${bundle._id}_adjust`] ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <BarChart3 className="w-3 h-3" />
+                                      )}
+                                      Adjust
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                {/* Low stock threshold */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-700 dark:text-gray-300 text-sm">Low threshold:</span>
+                                  <input
+                                    type="number"
+                                    value={stockData.lowThreshold}
+                                    onChange={(e) => setStockData(prev => ({ ...prev, lowThreshold: e.target.value }))}
+                                    className="w-16 p-1 border rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white text-sm"
+                                    min="1"
+                                  />
+                                  <button
+                                    onClick={() => updateStock(bundle._id, type, 'threshold')}
+                                    disabled={stockUpdateLoading[`${bundle._id}_threshold`]}
+                                    className="p-1 text-xs bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-500 disabled:opacity-50"
+                                  >
+                                    {stockUpdateLoading[`${bundle._id}_threshold`] ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Settings className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                              
                               <div className="flex justify-between mt-2">
                                 <button
                                   onClick={() => updateBundlePrice(bundle._id, type)}
@@ -409,7 +690,7 @@ const BundlePriceList = () => {
                                   className="p-2 text-sm bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-700 flex items-center gap-1"
                                 >
                                   {updateLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                                  Save
+                                  Save Prices
                                 </button>
                                 <button
                                   onClick={cancelEditing}
@@ -423,42 +704,40 @@ const BundlePriceList = () => {
                           ) : (
                             // Display mode
                             <div className="flex flex-col">
-                              {/* Stock status indicator */}
+                              {/* Stock status indicator with units */}
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
-                                  {isInStock ? (
-                                    <Package className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                  ) : (
-                                    <PackageX className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                  )}
-                                  <span className={`text-xs font-medium ${
-                                    isInStock 
-                                      ? 'text-green-600 dark:text-green-400' 
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    {isInStock ? 'In Stock' : 'Out of Stock'}
-                                  </span>
+                                  {getStockStatusBadge(bundle)}
                                 </div>
                                 
-                                {/* Stock toggle button */}
-                                <button
-                                  onClick={() => toggleStock(bundle._id, type, isInStock)}
-                                  disabled={stockUpdateLoading[bundle._id]}
-                                  className={`p-1 rounded ${
-                                    isInStock 
-                                      ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' 
-                                      : 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
-                                  }`}
-                                  title={isInStock ? 'Mark as out of stock' : 'Mark as in stock'}
-                                >
-                                  {stockUpdateLoading[bundle._id] ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : isInStock ? (
-                                    <PackageX className="w-4 h-4" />
-                                  ) : (
-                                    <Package className="w-4 h-4" />
-                                  )}
-                                </button>
+                                {/* Quick stock actions */}
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => fetchStockHistory(bundle._id)}
+                                    className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    title="View stock history"
+                                  >
+                                    <History className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => toggleStock(bundle._id, type, bundle.stockInfo?.available > 0)}
+                                    disabled={stockUpdateLoading[bundle._id]}
+                                    className={`p-1 rounded ${
+                                      bundle.stockInfo?.available > 0 
+                                        ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' 
+                                        : 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                    }`}
+                                    title={bundle.stockInfo?.available > 0 ? 'Mark as out of stock' : 'Mark as in stock'}
+                                  >
+                                    {stockUpdateLoading[bundle._id] ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : bundle.stockInfo?.available > 0 ? (
+                                      <PackageX className="w-4 h-4" />
+                                    ) : (
+                                      <Package className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                               
                               <div className="flex justify-between items-center">
@@ -468,11 +747,21 @@ const BundlePriceList = () => {
                                 <button
                                   onClick={() => startEditing(bundle)}
                                   className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                  title="Edit prices"
+                                  title="Edit prices and stock"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
                               </div>
+                              
+                              {/* Stock units display */}
+                              {bundle.stockInfo && (
+                                <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                  Stock: {bundle.stockInfo.available || 0} units
+                                  {bundle.stockInfo.reserved > 0 && (
+                                    <span className="text-yellow-600 dark:text-yellow-400"> ({bundle.stockInfo.reserved} reserved)</span>
+                                  )}
+                                </div>
+                              )}
                               
                               <div className="flex justify-between items-center mt-2">
                                 <div className="text-gray-700 dark:text-gray-300 font-medium">
@@ -494,13 +783,53 @@ const BundlePriceList = () => {
                               {/* Expanded details */}
                               {expandedBundle === bundle._id && (
                                 <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                                  {/* Stock details */}
+                                  <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+                                    <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-1">Stock Details:</h4>
+                                    <div className="grid grid-cols-2 gap-1">
+                                      <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Available:</span>
+                                        <span className="font-semibold ml-1">{bundle.stockInfo?.available || 0}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Reserved:</span>
+                                        <span className="font-semibold ml-1">{bundle.stockInfo?.reserved || 0}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Total Sold:</span>
+                                        <span className="font-semibold ml-1">{bundle.stockInfo?.sold || 0}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Threshold:</span>
+                                        <span className="font-semibold ml-1">{bundle.stockInfo?.lowStockThreshold || 10}</span>
+                                      </div>
+                                    </div>
+                                    {bundle.stockInfo?.stockPercentage !== undefined && (
+                                      <div className="mt-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-gray-600 dark:text-gray-400">Stock Level:</span>
+                                          <span className="font-semibold">{bundle.stockInfo.stockPercentage}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                                          <div
+                                            className={`h-1.5 rounded-full ${
+                                              bundle.stockInfo.stockPercentage > 50 ? 'bg-green-500' :
+                                              bundle.stockInfo.stockPercentage > 20 ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`}
+                                            style={{ width: `${bundle.stockInfo.stockPercentage}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  
                                   {/* Stock info if out of stock */}
-                                  {!isInStock && bundle.stockInfo?.reason && (
+                                  {bundle.stockInfo?.available === 0 && bundle.stockInfo?.reason && (
                                     <div className="mb-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm">
                                       <div className="flex items-start gap-1">
                                         <Info className="w-3 h-3 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                         <div className="text-red-700 dark:text-red-300">
-                                          <p className="font-medium">Reason:</p>
+                                          <p className="font-medium">Out of Stock Reason:</p>
                                           <p className="text-xs">{bundle.stockInfo.reason}</p>
                                         </div>
                                       </div>
@@ -526,6 +855,62 @@ const BundlePriceList = () => {
                                         No role-specific pricing set
                                       </p>
                                     )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Stock history modal */}
+                              {showStockHistory === bundle._id && stockHistory[bundle._id] && (
+                                <div className="fixed inset-0 z-50 overflow-y-auto">
+                                  <div className="flex items-center justify-center min-h-screen px-4">
+                                    <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowStockHistory(null)} />
+                                    
+                                    <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+                                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                        Stock History: {bundle.type} - {bundle.capacity}GB
+                                      </h3>
+                                      
+                                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                                        {stockHistory[bundle._id].restockHistory?.length > 0 ? (
+                                          stockHistory[bundle._id].restockHistory.map((history, idx) => (
+                                            <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                                              <div className="flex justify-between items-start">
+                                                <div>
+                                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                                    {history.addedUnits > 0 ? '+' : ''}{history.addedUnits} units
+                                                  </p>
+                                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {history.previousUnits} → {history.newTotal} units
+                                                  </p>
+                                                  {history.reason && (
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                      {history.reason}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                                <div className="text-right">
+                                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {new Date(history.restockedAt).toLocaleDateString()}
+                                                  </p>
+                                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {history.restockedBy?.username || 'System'}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <p className="text-sm text-gray-500 dark:text-gray-400">No restock history available</p>
+                                        )}
+                                      </div>
+                                      
+                                      <button
+                                        onClick={() => setShowStockHistory(null)}
+                                        className="mt-4 w-full px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                                      >
+                                        Close
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               )}
