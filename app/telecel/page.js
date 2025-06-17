@@ -1,6 +1,5 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 
 const TelecelBundleCards = () => {
   const [bundles, setBundles] = useState([]);
@@ -27,15 +26,16 @@ const TelecelBundleCards = () => {
         const token = localStorage.getItem('igettoken');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         
-        const response = await axios.get('https://iget.onrender.com/api/iget/bundle', { headers });
+        const response = await fetch('https://iget.onrender.com/api/iget/bundle', { headers });
+        const data = await response.json();
         
         // If the API returns userRole, save it
-        if (response.data.userRole) {
-          setUserRole(response.data.userRole);
+        if (data.userRole) {
+          setUserRole(data.userRole);
         }
         
         // Filter for Telecel bundles only
-        const telecelBundles = response.data.data.filter(bundle => 
+        const telecelBundles = data.data.filter(bundle => 
           bundle.network === 'telecel' || bundle.type === 'Telecel-5959');
         
         setBundles(telecelBundles);
@@ -67,7 +67,28 @@ const TelecelBundleCards = () => {
     if (bundle.stockInfo?.isOutOfStock === true) return false;
     if (bundle.isInStock === false) return false;
     if (bundle.stockStatus?.isOutOfStock === true) return false;
+    // Check if available units is 0 or undefined
+    if (bundle.stockUnits?.available === 0) return false;
     return true;
+  };
+
+  // Get available units for display
+  const getAvailableUnits = (bundle) => {
+    return bundle.stockUnits?.available || 0;
+  };
+
+  // Get stock status color and text
+  const getStockStatus = (bundle) => {
+    const availableUnits = getAvailableUnits(bundle);
+    const lowStockThreshold = bundle.stockUnits?.lowStockThreshold || 10;
+    
+    if (availableUnits === 0) {
+      return { color: 'text-red-600', text: 'Out of Stock', bgColor: 'bg-red-100' };
+    } else if (availableUnits <= lowStockThreshold) {
+      return { color: 'text-orange-600', text: 'Low Stock', bgColor: 'bg-orange-100' };
+    } else {
+      return { color: 'text-green-600', text: 'In Stock', bgColor: 'bg-green-100' };
+    }
   };
 
   // Get price to display - use userPrice if available, fall back to standard price
@@ -145,32 +166,33 @@ const TelecelBundleCards = () => {
       }
       
       // Send all the required fields that the backend expects
-      const response = await axios.post(
-        'https://iget.onrender.com/api/orders/placeorder',
-        {
+      const response = await fetch('https://iget.onrender.com/api/orders/placeorder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
           recipientNumber: recipientNumber,
           capacity: selectedBundle.capacity,
           price: getDisplayPrice(selectedBundle),
           bundleType: selectedBundle.type || 'Telecel-5959'
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+        })
+      });
+      
+      const data = await response.json();
       
       setPurchaseStatus({
         success: true,
         message: 'Bundle purchased successfully!',
-        orderDetails: response.data.data
+        orderDetails: data.data
       });
       
     } catch (err) {
       console.error("Purchase error:", err);
       setPurchaseStatus({
         success: false,
-        message: err.response?.data?.message || 'Failed to process your purchase. Please try again.'
+        message: err.message || 'Failed to process your purchase. Please try again.'
       });
     } finally {
       setProcessingOrder(false);
@@ -214,6 +236,8 @@ const TelecelBundleCards = () => {
           {filteredBundles.map((bundle) => {
             const displayPrice = getDisplayPrice(bundle);
             const isInStock = isBundleInStock(bundle);
+            const availableUnits = getAvailableUnits(bundle);
+            const stockStatus = getStockStatus(bundle);
             
             return (
               <div
@@ -229,12 +253,21 @@ const TelecelBundleCards = () => {
                   <h3 className="text-xl font-bold text-white">
                     {(bundle.capacity).toFixed(bundle.capacity % 1000 === 0 ? 0 : 1)} GB
                   </h3>
+                  
+                  {/* Stock Status Badge */}
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    isInStock ? 'bg-white text-red-600' : 'bg-red-700 text-white'
+                  }`}>
+                    {availableUnits} units left
+                  </div>
+                  
                   {!isInStock && (
                     <span className="text-xs text-white bg-red-700 px-2 py-1 rounded-full">
                       OUT OF STOCK
                     </span>
                   )}
                 </div>
+                
                 <div className={`grid grid-cols-2 text-white ${
                   isInStock ? 'bg-black' : 'bg-gray-600'
                 } rounded-b-lg`}>
@@ -247,6 +280,15 @@ const TelecelBundleCards = () => {
                     <p className="text-sm font-bold">Duration</p>
                   </div>
                 </div>
+                
+                {/* Stock Status Bar */}
+                <div className={`px-3 py-2 text-xs font-medium ${stockStatus.bgColor} ${stockStatus.color}`}>
+                  <div className="flex justify-between items-center">
+                    <span>{stockStatus.text}</span>
+                    <span className="font-bold">{availableUnits} available</span>
+                  </div>
+                </div>
+                
                 <button 
                   className={`w-full px-4 py-2 font-semibold transition-colors ${
                     isInStock 
@@ -299,6 +341,9 @@ const TelecelBundleCards = () => {
                 <p className="text-gray-700 dark:text-gray-300 mb-2">
                   <strong>{(outOfStockBundle.capacity).toFixed(outOfStockBundle.capacity % 1000 === 0 ? 0 : 1)} GB</strong> bundle is currently unavailable
                 </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <strong>Available Units:</strong> {getAvailableUnits(outOfStockBundle)}
+                </p>
                 {outOfStockBundle.stockInfo?.reason && (
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Reason: {outOfStockBundle.stockInfo.reason}
@@ -349,6 +394,12 @@ const TelecelBundleCards = () => {
               <div className="flex justify-between mb-3">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Validity:</span>
                 <span className="text-black dark:text-white font-medium">{selectedBundle.validity || "60 Days"}</span>
+              </div>
+              <div className="flex justify-between mb-3">
+                <span className="font-semibold text-gray-700 dark:text-gray-300">Units Available:</span>
+                <span className={`font-medium ${getStockStatus(selectedBundle).color}`}>
+                  {getAvailableUnits(selectedBundle)} units
+                </span>
               </div>
             </div>
             
