@@ -113,6 +113,11 @@ export default function OrdersManagement() {
           ...prev,
           [order._id]: new Date().toISOString()
         }));
+        
+        // Auto-update internal status if external status is delivered/completed
+        if (result.data.status?.toLowerCase() === 'delivered' && order.status !== 'completed') {
+          await handleStatusChange(order._id, 'completed', true); // Added third parameter to indicate auto-update
+        }
       }
     } catch (error) {
       console.error('Error checking external status:', error);
@@ -124,11 +129,17 @@ export default function OrdersManagement() {
   // Bulk check external statuses for all visible mtnup2u orders
   const checkAllMtnUp2uStatuses = async () => {
     const mtnUp2uOrders = displayedOrders.filter(order => order.bundleType?.toLowerCase() === 'mtnup2u');
+    let updatedCount = 0;
     
     for (const order of mtnUp2uOrders) {
       await checkExternalStatus(order);
       // Small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    // Show a summary message if any orders were auto-updated
+    if (updatedCount > 0) {
+      setUpdateSuccessMessage(`${updatedCount} MTN orders auto-updated to completed based on HubNet status`);
     }
   };
 
@@ -137,7 +148,8 @@ export default function OrdersManagement() {
     const mtnUp2uOrders = displayedOrders.filter(order => 
       order.bundleType?.toLowerCase() === 'mtnup2u' && 
       !externalStatuses[order._id] && 
-      !checkingStatuses[order._id]
+      !checkingStatuses[order._id] &&
+      order.status !== 'completed' // Only check if not already completed
     );
 
     if (mtnUp2uOrders.length > 0) {
@@ -457,7 +469,7 @@ export default function OrdersManagement() {
     setExcludedNetworkCapacities([]);
   };
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus, isAutoUpdate = false) => {
     try {
       setError(null);
       
@@ -486,7 +498,11 @@ export default function OrdersManagement() {
               : order
           )
         );
-        setUpdateSuccessMessage(`Order ${orderId.substring(0, 8)}... updated to ${newStatus}`);
+        setUpdateSuccessMessage(
+          isAutoUpdate 
+            ? `Order ${orderId.substring(0, 8)}... auto-updated to ${newStatus} (HubNet confirmed)`
+            : `Order ${orderId.substring(0, 8)}... updated to ${newStatus}`
+        );
       } else {
         setError('Failed to update order status');
       }
