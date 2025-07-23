@@ -87,7 +87,7 @@ export default function OrdersManagement() {
     setCheckingStatuses(prev => ({ ...prev, [order._id]: true }));
 
     try {
-      const response = await fetch(`https://console.hubnet.app/live/api/context/business/transaction-checker?reference=${order.orderReference}`, {
+      const response = await fetch(`https://console.hubnet.app/live/ap/context/business/transaction-checker?reference=${order.orderReference}`, {
         method: 'GET',
         headers: {
           'token': 'Bearer biWUr20SFfp8W33BRThwqTkg2PhoaZTkeWx',
