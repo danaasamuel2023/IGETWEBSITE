@@ -688,17 +688,20 @@ const getRoleBadgeColor = (role) => {
     }
   };
 
-  // Helper function to get role display name
-  const getRoleDisplayName = (role) => {
-    switch(role) {
-      case 'wallet_admin': return 'Wallet Admin';
-      case 'Editor': return 'Editor';
-      case 'admin': return 'Admin';
-      case 'agent': return 'Agent';
-      case 'user': return 'User';
-      default: return role || 'user';
-    }
-  };
+  /// Helper function to get role display name
+const getRoleDisplayName = (role) => {
+  switch(role) {
+    case 'wallet_admin': return 'Wallet Admin';
+    case 'editor': return 'Editor';
+    case 'admin': return 'Admin';
+    case 'agent': return 'Agent';
+    case 'user': return 'User';
+    case 'business': return 'Business';
+    case 'dealers': return 'Dealers';
+    case 'enterprise': return 'Enterprise';
+    default: return role || 'user';
+  }
+};
 
   // Generate page numbers for pagination
   const getPageNumbers = () => {
