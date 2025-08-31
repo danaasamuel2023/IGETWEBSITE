@@ -33,11 +33,14 @@ const BundleManagement = () => {
   ];
 
   const userRoles = [
-    { id: 'user', label: 'User' },
     { id: 'admin', label: 'Admin' },
+    { id: 'user', label: 'User' },
     { id: 'agent', label: 'Agent' },
-    { id: 'Editor', label: 'Editor' }
-  ];
+    { id: 'editor', label: 'Editor' },
+    { id: 'business', label: 'Business' },
+    { id: 'dealers', label: 'Dealers' },
+    { id: 'enterprise', label: 'Enterprise' }
+];
 
   // Fetch bundles by type
   const fetchBundles = async (type) => {

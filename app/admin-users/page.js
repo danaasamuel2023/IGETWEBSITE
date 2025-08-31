@@ -652,23 +652,28 @@ export default function UsersManagement() {
   };
 
   // Helper function to get role badge color
-  const getRoleBadgeColor = (role) => {
-    switch(role) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'wallet_admin':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'Editor':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'agent':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-      case 'user':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  };
-
+const getRoleBadgeColor = (role) => {
+  switch(role) {
+    case 'admin':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+    case 'wallet_admin':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+    case 'editor':
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    case 'agent':
+      return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+    case 'user':
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    case 'business':
+      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+    case 'dealers':
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
+    case 'enterprise':
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+    default:
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+  }
+};
   // NEW: Helper function to get approval status badge color
   const getApprovalStatusBadgeColor = (status) => {
     switch(status) {
