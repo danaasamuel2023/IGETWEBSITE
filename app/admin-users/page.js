@@ -1397,17 +1397,20 @@ const getRoleDisplayName = (role) => {
                             <div className="mb-4">
                               <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
                               <select
-                                id="role"
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                value={newRole}
-                                onChange={(e) => setNewRole(e.target.value)}
-                              >
-                                <option value="user">User</option>
-                                <option value="agent">Agent</option>
-                                <option value="Editor">Editor</option>
-                                <option value="wallet_admin">Wallet Admin</option>
-                                <option value="admin">Full Admin</option>
-                              </select>
+  id="role"
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+  value={newRole}
+  onChange={(e) => setNewRole(e.target.value)}
+>
+  <option value="user">User</option>
+  <option value="agent">Agent</option>
+  <option value="editor">Editor</option>
+  <option value="business">Business</option>
+  <option value="dealers">Dealers</option>
+  <option value="enterprise">Enterprise</option>
+  <option value="wallet_admin">Wallet Admin</option>
+  <option value="admin">Full Admin</option>
+</select>
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                               <strong>Role Descriptions:</strong>
