@@ -1396,7 +1396,7 @@ const getRoleDisplayName = (role) => {
                           <form onSubmit={handleChangeRole}>
                             <div className="mb-4">
                               <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-                              <select
+                          <select
   id="role"
   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
   value={newRole}
@@ -1404,10 +1404,10 @@ const getRoleDisplayName = (role) => {
 >
   <option value="user">User</option>
   <option value="agent">Agent</option>
-  <option value="editor">Editor</option>
-  <option value="business">Business</option>
-  <option value="dealers">Dealers</option>
-  <option value="enterprise">Enterprise</option>
+  <option value="Editor">Editor</option>  {/* Note: capital E */}
+  <option value="Business">Business</option>  {/* Change to capital B */}
+  <option value="Dealers">Dealers</option>  {/* Change to capital D */}
+  <option value="Enterprise">Enterprise</option>  {/* Change to capital E */}
   <option value="wallet_admin">Wallet Admin</option>
   <option value="admin">Full Admin</option>
 </select>
