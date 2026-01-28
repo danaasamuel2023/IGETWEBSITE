@@ -37,7 +37,10 @@ const BundlePriceList = () => {
     admin: '',
     user: '',
     agent: '',
-    Editor: ''
+    Editor: '',
+    Business: '',
+    Dealers: '',
+    Enterprise: ''
   });
   const [stockData, setStockData] = useState({
     available: '',
@@ -64,11 +67,11 @@ const BundlePriceList = () => {
     { id: 'admin', label: 'Admin' },
     { id: 'user', label: 'User' },
     { id: 'agent', label: 'Agent' },
-    { id: 'editor', label: 'Editor' },
-    { id: 'business', label: 'Business' },
-    { id: 'dealers', label: 'Dealers' },
-    { id: 'enterprise', label: 'Enterprise' }
-];
+    { id: 'Editor', label: 'Editor' },
+    { id: 'Business', label: 'Business' },
+    { id: 'Dealers', label: 'Dealers' },
+    { id: 'Enterprise', label: 'Enterprise' }
+  ];
 
   useEffect(() => {
     fetchAllBundles();
@@ -308,14 +311,17 @@ const BundlePriceList = () => {
 
   const startEditing = (bundle) => {
     setEditingBundle(bundle._id);
-    
+
     // Initialize with current values
     setEditPrices({
       standard: bundle.price.toString(),
       admin: bundle.rolePricing?.admin?.toString() || bundle.price.toString(),
       user: bundle.rolePricing?.user?.toString() || bundle.price.toString(),
       agent: bundle.rolePricing?.agent?.toString() || bundle.price.toString(),
-      Editor: bundle.rolePricing?.Editor?.toString() || bundle.price.toString()
+      Editor: bundle.rolePricing?.Editor?.toString() || bundle.price.toString(),
+      Business: bundle.rolePricing?.Business?.toString() || bundle.price.toString(),
+      Dealers: bundle.rolePricing?.Dealers?.toString() || bundle.price.toString(),
+      Enterprise: bundle.rolePricing?.Enterprise?.toString() || bundle.price.toString()
     });
     
     // Initialize stock data
@@ -334,7 +340,10 @@ const BundlePriceList = () => {
       admin: '',
       user: '',
       agent: '',
-      Editor: ''
+      Editor: '',
+      Business: '',
+      Dealers: '',
+      Enterprise: ''
     });
     setStockData({
       available: '',
@@ -370,7 +379,10 @@ const BundlePriceList = () => {
         admin: parseFloat(editPrices.admin),
         user: parseFloat(editPrices.user),
         agent: parseFloat(editPrices.agent),
-        Editor: parseFloat(editPrices.Editor)
+        Editor: parseFloat(editPrices.Editor),
+        Business: parseFloat(editPrices.Business),
+        Dealers: parseFloat(editPrices.Dealers),
+        Enterprise: parseFloat(editPrices.Enterprise)
       };
       
       await axios.put(`https://iget.onrender.com/api/iget/${bundleId}`, {
