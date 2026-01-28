@@ -31,6 +31,9 @@ const Navigation = () => {
        case 'wallet_admin': return 'Wallet Admin';
        case 'agent': return 'Agent';
        case 'Editor': return 'Editor';
+       case 'Business': return 'Business';
+       case 'Dealers': return 'Dealers';
+       case 'Enterprise': return 'Enterprise';
        default: return 'User';
      }
    };
@@ -44,6 +47,9 @@ const Navigation = () => {
        case 'wallet_admin': return 'bg-blue-500';
        case 'agent': return 'bg-cyan-500';
        case 'Editor': return 'bg-orange-500';
+       case 'Business': return 'bg-indigo-500';
+       case 'Dealers': return 'bg-teal-500';
+       case 'Enterprise': return 'bg-amber-500';
        default: return 'bg-gray-500';
      }
    };
@@ -88,6 +94,8 @@ const Navigation = () => {
          if (token && userData) {
            setUser(JSON.parse(userData));
            fetchUserBalance(token);
+           // Fetch fresh user data to get updated role
+           fetchUserData(token);
          } else {
            setUser(null);
            setBalance(null);
@@ -148,6 +156,33 @@ const Navigation = () => {
        }
      } catch (error) {
        console.error('Error fetching user balance:', error);
+     }
+   };
+
+   // Fetch fresh user data from API to get updated role
+   const fetchUserData = async (token) => {
+     try {
+       const response = await fetch('https://iget.onrender.com/api/user', {
+         method: 'GET',
+         headers: {
+           'Authorization': `Bearer ${token}`,
+           'Content-Type': 'application/json'
+         }
+       });
+
+       if (!response.ok) {
+         throw new Error('Failed to fetch user data');
+       }
+
+       const data = await response.json();
+
+       if (data.success && data.user) {
+         // Update localStorage with fresh user data
+         localStorage.setItem('userData', JSON.stringify(data.user));
+         setUser(data.user);
+       }
+     } catch (error) {
+       console.error('Error fetching fresh user data:', error);
      }
    };
 
