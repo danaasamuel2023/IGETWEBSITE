@@ -1,155 +1,174 @@
 'use client'
-import React, { useState } from 'react';
-import Head from 'next/head';
+import { useState } from 'react';
+import { BookOpen, Send, Search, Copy, Check, ChevronRight } from 'lucide-react';
+
+const BASE_URL = 'https://iget.onrender.com';
 
 export default function ApiDocumentation() {
   const [activeTab, setActiveTab] = useState('placeOrder');
+  const [copied, setCopied] = useState(null);
+
+  const copyText = (text, id) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const tabs = [
+    { id: 'placeOrder', label: 'Place Order', method: 'POST', icon: Send },
+    { id: 'getOrderByReference', label: 'Get Order', method: 'GET', icon: Search },
+  ];
+
+  const CodeBlock = ({ code, id, lang = '' }) => (
+    <div className="relative group">
+      <pre className="bg-gray-950 text-gray-100 text-xs sm:text-sm rounded-lg p-4 overflow-x-auto leading-relaxed">
+        <code>{code}</code>
+      </pre>
+      <button
+        onClick={() => copyText(code, id)}
+        className="absolute top-2.5 right-2.5 p-1.5 rounded-md bg-gray-800 text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        {copied === id ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  );
+
+  const MethodBadge = ({ method }) => (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+      method === 'POST' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    }`}>
+      {method}
+    </span>
+  );
+
+  const StatusBadge = ({ status, color }) => (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${color}`}>{status}</span>
+  );
+
+  const ParamRow = ({ name, type, desc, required = true }) => (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+      <div className="sm:w-36 shrink-0 flex items-center gap-2">
+        <code className="text-xs font-mono text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{name}</code>
+        {required && <span className="text-[9px] text-red-500 font-medium">required</span>}
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="text-[10px] text-gray-400 uppercase tracking-wider">{type}</span>
+        <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">{desc}</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Head>
-        <title>Iget API Documentation</title>
-        <meta name="description" content="API documentation for the Iget platform" />
-      </Head>
-
-      <header className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold">Iget API Documentation</h1>
-          <p className="mt-2 text-purple-100">Bundle Management API</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center">
+              <BookOpen className="w-4.5 h-4.5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">API Documentation</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">iGet Developer API v1</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Sidebar Navigation */}
-          <aside className="md:w-64 flex-shrink-0">
-            <nav className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sticky top-4">
-              <ul className="space-y-1">
-                <li>
-                  <button 
-                    onClick={() => setActiveTab('placeOrder')}
-                    className={`w-full text-left px-4 py-2 rounded ${activeTab === 'placeOrder' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-200'}`}
-                  >
-                    Place Order
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => setActiveTab('getOrderByReference')}
-                    className={`w-full text-left px-4 py-2 rounded ${activeTab === 'getOrderByReference' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-200'}`}
-                  >
-                    Get Order By Reference
-                  </button>
-                </li>
-              </ul>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Sidebar */}
+          <aside className="md:w-52 shrink-0">
+            <nav className="md:sticky md:top-20 space-y-1">
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Endpoints</p>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 font-medium'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <MethodBadge method={tab.method} />
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              ))}
+
+              {/* Quick info */}
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Base URL</p>
+                <code className="block px-3 text-xs font-mono text-gray-600 dark:text-gray-400 break-all">{BASE_URL}</code>
+              </div>
+              <div className="mt-3">
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2">Auth</p>
+                <code className="block px-3 text-xs font-mono text-gray-600 dark:text-gray-400">X-API-Key: your_key</code>
+              </div>
             </nav>
           </aside>
 
-          {/* Main Content */}
-          <main className="flex-grow">
+          {/* Main content */}
+          <main className="flex-1 min-w-0 space-y-5">
+
+            {/* ============ PLACE ORDER ============ */}
             {activeTab === 'placeOrder' && (
-              <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Place an Order</h2>
-                
-                <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 rounded">
-                  <p className="text-blue-800 dark:text-blue-200">
-                    This endpoint allows you to purchase mobile data bundles for any phone number. 
-                    Payment is automatically processed from your wallet balance.
-                  </p>
+              <>
+                {/* Endpoint */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <MethodBadge method="POST" />
+                      <code className="text-sm font-mono text-gray-900 dark:text-white">/api/developer/orders/place</code>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Purchase a data bundle for any phone number. Payment is deducted from your wallet.
+                    </p>
+                  </div>
+
+                  {/* Important note */}
+                  <div className="mx-5 mt-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg px-4 py-3">
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      <span className="font-semibold">Important:</span> Always store the <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">orderReference</code> from the response. You'll need it to track order status.
+                    </p>
+                  </div>
+
+                  {/* Request body */}
+                  <div className="p-5">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Request Body</h3>
+                    <CodeBlock id="req-body" code={`{
+  "recipientNumber": "0201234567",
+  "capacity": 1,
+  "bundleType": "mtnup2u"
+}`} />
+                  </div>
+
+                  {/* Parameters */}
+                  <div className="px-5 pb-5">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Parameters</h3>
+                    <div className="border border-gray-100 dark:border-gray-700 rounded-lg px-4">
+                      <ParamRow name="recipientNumber" type="string" desc="Phone number starting with 0. Example: 0201234567" />
+                      <ParamRow name="capacity" type="number" desc="Bundle size in GB. Values: 1, 2, 5, 10, 15, 20" />
+                      <ParamRow name="bundleType" type="string" desc="mtnup2u, mtn-fibre, mtn-justforu, AT-ishare, Telecel-5959" />
+                      <ParamRow name="reference" type="string" desc="Your own order reference (max 50 chars). Auto-generated if not provided." required={false} />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-500 rounded">
-                  <p className="text-yellow-800 dark:text-yellow-200 font-medium">
-                    <strong>Important:</strong> Always store the <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">orderReference</code> returned in the response. 
-                    This reference is essential for tracking and verifying the status of orders, especially when handling callbacks or checking order completion status.
-                  </p>
-                </div>
-                
-                <div className="mb-4">
-                  <span className="bg-green-500 text-white text-sm font-bold px-2 py-1 rounded-md mr-2">POST</span>
-                  <code className="font-mono bg-gray-100 dark:bg-gray-700 dark:text-gray-200 px-2 py-1">/api/developer/orders/place</code>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Authentication</h3>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Header</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Value</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono text-sm dark:text-gray-200">X-API-Key</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono text-sm dark:text-gray-200">your_api_key</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Your API key for authentication</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Request Body</h3>
-                <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-6">
-                  <pre className="text-sm overflow-x-auto dark:text-gray-200">
-{`{
-  "recipientNumber": "0201234567",    // Required: Phone number starting with 0
-  "capacity": 1,                    // Required: Bundle capacity in GB
-  "bundleType": "mtnup2u"             // Required: Bundle type (see Bundle Types section)
-}`}
-                  </pre>
-                </div>
-                
-                <h4 className="font-medium text-gray-700 dark:text-gray-200 mb-2">Field Descriptions:</h4>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Field</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Type</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">recipientNumber</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">String</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Phone number must start with 0 (local format).<br/>
-                          Example: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">0201234567</code>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">capacity</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Number</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Data bundle size in  (GB).<br/>
-                          Common values: 1, 2, 5, 10, 20
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">bundleType</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">String</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Type of bundle to purchase.<br/>
-                          Values: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">mtnup2u</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">mtn-fibre</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">mtn-justforu</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">AT-ishare</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">Telecel-5959</code>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Response (201 Created)</h3>
-                <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-6">
-                  <pre className="text-sm overflow-x-auto dark:text-gray-200">
-{`{
+                {/* Response */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Response <span className="text-green-600 dark:text-green-400 ml-1">201 Created</span></h3>
+                  </div>
+                  <div className="p-5">
+                    <CodeBlock id="res-place" code={`{
   "success": true,
   "message": "Order placed successfully and payment processed",
   "data": {
     "order": {
       "id": "6074e5b5c72e3a001fc4b3a1",
-      "orderReference": "ORD-123456",
+      "orderReference": "ABC123",
       "recipientNumber": "0201234567",
       "bundleType": "mtnup2u",
       "capacity": 1,
@@ -165,147 +184,118 @@ export default function ApiDocumentation() {
     },
     "walletBalance": 94.01
   }
-}`}
-                  </pre>
+}`} />
+                  </div>
                 </div>
 
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Order Status Values</h3>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Status</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full text-xs font-medium">pending</span>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Order has been created and payment processed, but bundle has not yet been delivered
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-xs font-medium">completed</span>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Bundle has been successfully delivered to the recipient
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          <span className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-full text-xs font-medium">failed</span>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Order could not be completed due to an error. Check failureReason field for details
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs font-medium">processing</span>
-                        </td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          Order is being processed by the network provider
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                {/* Order statuses */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Order Status Values</h3>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    {[
+                      { status: 'pending', desc: 'Order created, payment processed, bundle not yet delivered', color: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+                      { status: 'processing', desc: 'Being processed by the network provider', color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+                      { status: 'completed', desc: 'Bundle successfully delivered to recipient', color: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+                      { status: 'failed', desc: 'Could not be completed. Check failureReason for details', color: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+                    ].map((s) => (
+                      <div key={s.status} className="flex items-start gap-3 px-5 py-3">
+                        <StatusBadge status={s.status} color={s.color} />
+                        <p className="text-sm text-gray-600 dark:text-gray-300">{s.desc}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Example Request</h3>
-                <div className="bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto">
-                  <pre>
-{`curl -X POST https://iget.onrender.com/api/developer/orders/place \\
+
+                {/* cURL example */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Example Request</h3>
+                  </div>
+                  <div className="p-5">
+                    <CodeBlock id="curl-place" code={`curl -X POST ${BASE_URL}/api/developer/orders/place \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: your_api_key_here" \\
   -d '{
     "recipientNumber": "0201234567",
     "capacity": 1,
     "bundleType": "mtnup2u"
-  }'`}
-                  </pre>
+  }'`} />
+                  </div>
                 </div>
-              </section>
+
+                {/* Bundle types */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Available Bundle Types</h3>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    {[
+                      { type: 'mtnup2u', network: 'MTN', desc: 'MTN Up2U bundles', color: 'bg-yellow-400 text-black' },
+                      { type: 'mtn-justforu', network: 'MTN', desc: 'MTN Just For U bundles', color: 'bg-yellow-400 text-black' },
+                      { type: 'mtn-fibre', network: 'MTN', desc: 'MTN Fibre bundles', color: 'bg-yellow-400 text-black' },
+                      { type: 'AT-ishare', network: 'AT', desc: 'AirtelTigo iShare bundles', color: 'bg-[#0066B3] text-white' },
+                      { type: 'Telecel-5959', network: 'TC', desc: 'Telecel enterprise bundles', color: 'bg-red-500 text-white' },
+                    ].map((b) => (
+                      <div key={b.type} className="flex items-center gap-3 px-5 py-3">
+                        <div className={`w-7 h-7 rounded-md ${b.color} flex items-center justify-center shrink-0`}>
+                          <span className="text-[9px] font-bold">{b.network}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <code className="text-xs font-mono text-gray-900 dark:text-white">{b.type}</code>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{b.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
 
+            {/* ============ GET ORDER ============ */}
             {activeTab === 'getOrderByReference' && (
-              <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Get Order By Reference</h2>
-                
-                <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 rounded">
-                  <p className="text-blue-800 dark:text-blue-200">
-                    This endpoint allows you to retrieve details about a specific order using its unique reference. 
-                    This is especially useful for checking the status of an order after it has been placed.
-                  </p>
+              <>
+                {/* Endpoint */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <MethodBadge method="GET" />
+                      <code className="text-sm font-mono text-gray-900 dark:text-white">/api/developer/orders/reference/<span className="text-violet-500">:orderRef</span></code>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Retrieve order details using its unique reference. Use this to check order status after placing.
+                    </p>
+                  </div>
+
+                  {/* Tip */}
+                  <div className="mx-5 mt-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50 rounded-lg px-4 py-3">
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      <span className="font-semibold">Tip:</span> Store the <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded">orderReference</code> in your database when placing orders for reconciliation.
+                    </p>
+                  </div>
+
+                  {/* Path params */}
+                  <div className="p-5">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Path Parameters</h3>
+                    <div className="border border-gray-100 dark:border-gray-700 rounded-lg px-4">
+                      <ParamRow name="orderRef" type="string" desc="The unique order reference returned when placing an order. Example: ABC123" />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-500 rounded">
-                  <p className="text-yellow-800 dark:text-yellow-200 font-medium">
-                    <strong>Best Practice:</strong> Always store the <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">orderReference</code> in your database when placing an order. 
-                    This reference should be used to track the order status through its lifecycle, especially for reconciliation processes.
-                  </p>
-                </div>
-                
-                <div className="mb-4">
-                  <span className="bg-blue-500 text-white text-sm font-bold px-2 py-1 rounded-md mr-2">GET</span>
-                  <code className="font-mono bg-gray-100 dark:bg-gray-700 dark:text-gray-200 px-2 py-1">/api/developer/orders/reference/:orderRef</code>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Authentication</h3>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Header</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Value</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono text-sm dark:text-gray-200">X-API-Key</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono text-sm dark:text-gray-200">your_api_key</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Your API key for authentication</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Path Parameters</h3>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Parameter</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Type</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">orderRef</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">String</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">
-                          The unique order reference returned when placing an order.<br/>
-                          Example: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">ORD-123456</code>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Response (200 OK)</h3>
-                <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mb-6">
-                  <pre className="text-sm overflow-x-auto dark:text-gray-200">
-{`{
+                {/* Response */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Response <span className="text-green-600 dark:text-green-400 ml-1">200 OK</span></h3>
+                  </div>
+                  <div className="p-5">
+                    <CodeBlock id="res-get" code={`{
   "success": true,
   "data": {
     "order": {
       "id": "6074e5b5c72e3a001fc4b3a1",
-      "orderReference": "ORD-123456",
+      "orderReference": "ABC123",
       "recipientNumber": "0201234567",
       "bundleType": "mtnup2u",
       "capacity": 1,
@@ -321,48 +311,44 @@ export default function ApiDocumentation() {
       "status": "completed"
     }
   }
-}`}
-                  </pre>
+}`} />
+                  </div>
                 </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Error Responses</h3>
-                <div className="overflow-x-auto mb-6">
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 dark:bg-gray-700">
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Status Code</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Error Message</th>
-                        <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left dark:text-gray-200">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">400</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Order reference is required</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">The order reference was not provided in the request</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">404</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Order not found or not authorized to access</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">The order with the given reference doesn't exist or doesn't belong to the authenticated user</td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">500</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">Server error</td>
-                        <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-200">An unexpected error occurred on the server</td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                {/* Error responses */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Error Responses</h3>
+                  </div>
+                  <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    {[
+                      { code: '400', msg: 'Order reference is required', desc: 'Missing orderRef in path' },
+                      { code: '401', msg: 'Invalid API key', desc: 'Missing or invalid X-API-Key header' },
+                      { code: '404', msg: 'Order not found', desc: 'No order with that reference, or not owned by you' },
+                      { code: '500', msg: 'Server error', desc: 'Unexpected server error' },
+                    ].map((e) => (
+                      <div key={e.code} className="flex items-start gap-3 px-5 py-3">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 shrink-0">{e.code}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 dark:text-white">{e.msg}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{e.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                
-                <h3 className="text-lg font-semibold mt-6 mb-3 dark:text-gray-200">Example Request</h3>
-                <div className="bg-gray-800 text-green-400 p-3 rounded-lg overflow-x-auto">
-                  <pre>
-{`curl -X GET https://iget.onrender.com/api/developer/orders/reference/ORD-123456 \\
-  -H "X-API-Key: your_api_key_here"`}
-                  </pre>
+
+                {/* cURL example */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Example Request</h3>
+                  </div>
+                  <div className="p-5">
+                    <CodeBlock id="curl-get" code={`curl -X GET ${BASE_URL}/api/developer/orders/reference/ABC123 \\
+  -H "X-API-Key: your_api_key_here"`} />
+                  </div>
                 </div>
-              </section>
+              </>
             )}
           </main>
         </div>

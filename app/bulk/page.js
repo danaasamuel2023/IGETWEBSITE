@@ -1,16 +1,12 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, FileSpreadsheet, Upload, Check, ArrowRight } from 'lucide-react';
+import { AlertCircle, FileSpreadsheet, Upload, Check, ArrowRight, Layers, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const BulkPurchaseComponent = () => {
-  // Input state
   const [bulkInput, setBulkInput] = useState('');
   const [bundleType, setBundleType] = useState('mtnup2u');
-  const [recipientNumber, setRecipientNumber] = useState('');
-  
-  // Data state
-  const [bundleOptions, setBundleOptions] = useState({}); // Will be populated from API
+  const [bundleOptions, setBundleOptions] = useState({});
   const [availableCapacities, setAvailableCapacities] = useState([]);
   const [parsedEntries, setParsedEntries] = useState([]);
   const [walletBalance, setWalletBalance] = useState(0);
@@ -19,103 +15,68 @@ const BulkPurchaseComponent = () => {
     { value: 'mtnup2u', label: 'MTN Up2U' },
     { value: 'TELECEL', label: 'Telecel' }
   ]);
-  
-  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState(null);
-  
-  // Fetch initial data on component mount
+
   useEffect(() => {
-    const initializeData = async () => {
+    const init = async () => {
       await fetchBundleData();
       await fetchWalletBalance();
       setLoading(false);
     };
-    
-    initializeData();
+    init();
   }, []);
-  
-  // Update network options when bundle data is loaded
+
   useEffect(() => {
     if (Object.keys(bundleOptions).length > 0) {
       const networks = Object.keys(bundleOptions).map(key => {
         let label = key;
-        
-        // Map network keys to friendly names
         if (key === 'mtnup2u') label = 'MTN Up2U';
         else if (key === 'TELECEL' || key === 'telecel-5959') label = 'Telecel';
         else if (key === 'YELLO' || key === 'mtn') label = 'MTN';
         else if (key === 'AT_PREMIUM' || key === 'at') label = 'AirtelTigo Premium';
+        else if (key === 'AT-ishare' || key === 'at-ishare') label = 'AirtelTigo iShare';
         else if (key === 'mtn-justforu') label = 'MTN Just For U';
-        
-        return {
-          value: key,
-          label: label
-        };
+        else if (key === 'mtn-fibre') label = 'MTN Fibre';
+        return { value: key, label };
       });
-      
       if (networks.length > 0) {
         setNetworkOptions(networks);
-        // Set default selected network to first available
         setBundleType(networks[0].value);
       }
     }
   }, [bundleOptions]);
-  
-  // Parse bulk input when it changes or when bundle type changes
+
   useEffect(() => {
     if (bulkInput.trim() === '') {
       setParsedEntries([]);
       setTotalCost(0);
       return;
     }
-    
     try {
-      // Split by lines first
       const lines = bulkInput.trim().split('\n');
       const entries = [];
       let calculatedTotal = 0;
-      
-      // Make sure we have bundle prices for the selected network
-      if (!bundleOptions[bundleType]) {
-        throw new Error(`No pricing information available for ${bundleType}`);
-      }
-      
+      if (!bundleOptions[bundleType]) throw new Error(`No pricing for ${bundleType}`);
       const networkPrices = bundleOptions[bundleType];
-      
       lines.forEach((line, index) => {
         const parts = line.trim().split(' ');
-        
         if (parts.length >= 2) {
           const recipient = parts[0].trim();
           const capacity = parts[1].trim();
-          
-          // Validate phone number - must be exactly 10 digits starting with 0
-          if (!/^0\d{9}$/.test(recipient)) {
-            throw new Error(`Line ${index + 1}: Invalid phone number format. Must be 10 digits starting with 0`);
-          }
-          
-          // Validate capacity
-          if (!networkPrices[capacity]) {
-            throw new Error(`Line ${index + 1}: Invalid capacity. Must be one of: ${Object.keys(networkPrices).join(', ')}`);
-          }
-          
+          if (!/^0\d{9}$/.test(recipient))
+            throw new Error(`Line ${index + 1}: Invalid phone number. Must be 10 digits starting with 0`);
+          if (!networkPrices[capacity])
+            throw new Error(`Line ${index + 1}: Invalid capacity. Options: ${Object.keys(networkPrices).join(', ')}`);
           const price = networkPrices[capacity];
           calculatedTotal += parseFloat(price);
-          
-          entries.push({
-            recipient,
-            capacity,
-            price,
-            lineNumber: index + 1
-          });
+          entries.push({ recipient, capacity, price, lineNumber: index + 1 });
         } else {
-          throw new Error(`Line ${index + 1}: Each line must contain both phone number and capacity separated by a space`);
+          throw new Error(`Line ${index + 1}: Format must be: phone_number capacity`);
         }
       });
-      
       setParsedEntries(entries);
       setTotalCost(calculatedTotal);
       setError('');
@@ -125,476 +86,407 @@ const BulkPurchaseComponent = () => {
       setTotalCost(0);
     }
   }, [bulkInput, bundleType, bundleOptions]);
-  
-  // Fetch bundle data from API
+
   const fetchBundleData = async () => {
     try {
-      // Get token from localStorage
       const token = localStorage.getItem('igettoken');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      const response = await fetch('https://iget.onrender.com/api/iget/bundle', { 
-        headers 
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch bundle data');
-      }
-      
+      const response = await fetch('https://iget.onrender.com/api/iget/bundle', { headers });
+      if (!response.ok) throw new Error('Failed to fetch bundle data');
       const data = await response.json();
-      
-      if (!data.data || !Array.isArray(data.data)) {
-        throw new Error('Invalid bundle data format');
-      }
-      
-      // Create a mapping of capacities to their prices by network type
+      if (!data.data || !Array.isArray(data.data)) throw new Error('Invalid bundle data format');
       const bundlePricing = {};
       const capacities = new Set();
-      
       data.data.forEach(bundle => {
         const type = bundle.type;
         const capacity = bundle.capacity.toString();
         const price = bundle.userPrice !== undefined ? bundle.userPrice : bundle.price;
-        
-        if (!bundlePricing[type]) {
-          bundlePricing[type] = {};
-        }
-        
+        if (!bundlePricing[type]) bundlePricing[type] = {};
         bundlePricing[type][capacity] = price;
         capacities.add(capacity);
       });
-      
       setBundleOptions(bundlePricing);
       setAvailableCapacities(Array.from(capacities).sort((a, b) => parseFloat(a) - parseFloat(b)));
-      
     } catch (error) {
       console.error('Error fetching bundle data:', error);
       setError('Failed to load bundle prices. Please try again.');
     }
   };
-  
-  // Fetch user's wallet balance
+
   const fetchWalletBalance = async () => {
     try {
-      // Get token from localStorage
       const token = localStorage.getItem('igettoken');
-      
-      if (!token) {
-        console.error('No auth token found');
-        return;
-      }
-      
+      if (!token) return;
       const response = await fetch('https://iget.onrender.com/api/iget/balance', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch wallet balance');
-      }
-      
+      if (!response.ok) throw new Error('Failed to fetch wallet balance');
       const data = await response.json();
-      
-      if (data.success) {
-        setWalletBalance(data.data.balance);
-      }
+      if (data.success) setWalletBalance(data.data.balance);
     } catch (error) {
       console.error('Error fetching wallet balance:', error);
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (parsedEntries.length === 0) {
-      setError('No valid entries to process');
-      return;
-    }
-    
-    if (totalCost > walletBalance) {
-      setError('Insufficient wallet balance for this bulk purchase');
-      return;
-    }
-    
+    if (parsedEntries.length === 0) { setError('No valid entries to process'); return; }
+    if (totalCost > walletBalance) { setError('Insufficient wallet balance'); return; }
     setIsProcessing(true);
     setError('');
-    
     try {
-      // Get token from localStorage
       const token = localStorage.getItem('igettoken');
-      
-      if (!token) {
-        setError('You need to be logged in to make a purchase');
-        setIsProcessing(false);
-        return;
-      }
-      
+      if (!token) { setError('You need to be logged in'); setIsProcessing(false); return; }
       const response = await fetch('https://iget.onrender.com/api/orders/bulk-purchase', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           networkKey: bundleType,
-          orders: parsedEntries.map(entry => ({
-            recipient: entry.recipient,
-            capacity: entry.capacity
-          }))
+          orders: parsedEntries.map(e => ({ recipient: e.recipient, capacity: e.capacity }))
         })
       });
-      
       const data = await response.json();
-      
       if (response.ok) {
         setResults(data);
         setBulkInput('');
-        fetchWalletBalance(); // Refresh wallet balance
+        fetchWalletBalance();
       } else {
         setError(data.message || 'Failed to process bulk purchase');
       }
     } catch (err) {
       setError('Network error. Please try again.');
-      console.error('Bulk purchase error:', err);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Handle file upload (Excel)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
-    // Only allow Excel files
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
       setError('Only Excel files (.xlsx or .xls) are supported');
       return;
     }
-    
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        // Parse Excel file
         const data = new Uint8Array(event.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        
-        // Get the first sheet
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Convert to JSON
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
-        // Convert to the required format (phone capacity)
-        const formattedData = jsonData
-          .filter(row => Array.isArray(row) && row.length >= 2) // Must have at least 2 columns
-          .map(row => {
-            // Get the first two columns
-            const phoneNumber = row[0]?.toString().trim();
-            const capacity = row[1]?.toString().trim();
-            
-            // Return formatted line
-            return `${phoneNumber} ${capacity}`;
-          })
-          .filter(line => line.split(' ').length === 2); // Must have both phone and capacity
-        
-        // Set the formatted data as input
-        setBulkInput(formattedData.join('\n'));
+        const formatted = jsonData
+          .filter(row => Array.isArray(row) && row.length >= 2)
+          .map(row => `${row[0]?.toString().trim()} ${row[1]?.toString().trim()}`)
+          .filter(line => line.split(' ').length === 2);
+        setBulkInput(formatted.join('\n'));
       } catch (error) {
-        console.error('Error parsing Excel file:', error);
-        setError('Failed to parse Excel file. Please check the format.');
+        setError('Failed to parse Excel file.');
       }
     };
-    
     reader.readAsArrayBuffer(file);
   };
 
-  // Download Excel template
   const downloadExcelTemplate = () => {
-    // Create workbook
     const workbook = XLSX.utils.book_new();
-    
-    // Get template capacities
-    const templateCapacities = availableCapacities.length > 0 
-      ? [
-          availableCapacities[0], 
-          availableCapacities[Math.min(2, availableCapacities.length - 1)],
-          availableCapacities[Math.min(4, availableCapacities.length - 1)]
-        ]
+    const caps = availableCapacities.length > 0
+      ? [availableCapacities[0], availableCapacities[Math.min(2, availableCapacities.length - 1)], availableCapacities[Math.min(4, availableCapacities.length - 1)]]
       : ['1', '5', '10'];
-    
-    // Create template data
-    const templateData = [
-      ['Phone Number', 'Capacity (GB)'],
-      ['0241234567', templateCapacities[0]],
-      ['0201234567', templateCapacities[1]],
-      ['0551234567', templateCapacities[2]]
-    ];
-    
-    // Create worksheet
+    const templateData = [['Phone Number', 'Capacity (GB)'], ['0241234567', caps[0]], ['0201234567', caps[1]], ['0551234567', caps[2]]];
     const worksheet = XLSX.utils.aoa_to_sheet(templateData);
-    
-    // Set column widths
-    const colWidths = [
-      { wch: 15 },  // Phone Number column
-      { wch: 15 }   // Capacity column
-    ];
-    worksheet['!cols'] = colWidths;
-    
-    // Add worksheet to workbook
+    worksheet['!cols'] = [{ wch: 15 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Bulk Purchase');
-    
-    // Generate Excel file and trigger download
     XLSX.writeFile(workbook, 'bulk_purchase_template.xlsx');
   };
 
-  // Loading state
+  // Get the network icon color for the selected network
+  const getNetworkColor = (type) => {
+    if (type.includes('mtn') || type === 'YELLO') return { ring: 'ring-yellow-400', bg: 'bg-yellow-400', text: '#000' };
+    if (type.includes('at') || type.includes('AT')) return { ring: 'ring-blue-500', bg: 'bg-blue-500', text: '#fff' };
+    if (type.includes('telecel') || type.includes('TELECEL')) return { ring: 'ring-red-500', bg: 'bg-red-500', text: '#fff' };
+    return { ring: 'ring-gray-400', bg: 'bg-gray-400', text: '#fff' };
+  };
+
+  const NetworkLogo = ({ type, size = 32 }) => {
+    const t = type.toLowerCase();
+    if (t.includes('mtn')) return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none"><rect width="100" height="100" rx="16" fill="#FFCC00"/><ellipse cx="50" cy="50" rx="38" ry="26" stroke="#000" strokeWidth="4" fill="none"/><text x="50" y="57" textAnchor="middle" fontFamily="Arial Black, Arial, sans-serif" fontSize="20" fontWeight="900" fill="#000">MTN</text></svg>
+    );
+    if (t.includes('at') || t.includes('ishare')) return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="48" fill="#0066B3"/><circle cx="35" cy="40" r="6" fill="#FFF"/><circle cx="65" cy="40" r="6" fill="#FFF"/><path d="M30 55 Q50 75 70 55" stroke="#FFF" strokeWidth="6" fill="none" strokeLinecap="round"/></svg>
+    );
+    if (t.includes('telecel')) return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none"><rect width="100" height="100" rx="16" fill="#FFF"/><circle cx="50" cy="50" r="42" fill="#E30613"/><text x="50" y="65" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="50" fontWeight="600" fill="#FFF">t</text></svg>
+    );
+    return (
+      <div className="rounded-lg bg-gray-500 flex items-center justify-center" style={{ width: size, height: size }}>
+        <Layers size={size * 0.5} className="text-white" />
+      </div>
+    );
+  };
+
   if (loading) return (
-    <div className="flex justify-center items-center py-20">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
-      <span className="ml-3 text-lg">Loading bundle data...</span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-blue-500"></div>
+        <p className="text-sm text-gray-400">Loading bundle data...</p>
+      </div>
     </div>
   );
 
+  const insufficientBalance = totalCost > walletBalance;
+
   return (
-    <div className="bg-gray-900 rounded-lg p-6">
-      <h2 className="text-2xl font-bold text-white mb-4">Bulk Data Purchase</h2>
-      
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="text-gray-300">Current Balance: <span className="font-semibold text-white">{walletBalance.toFixed(2)} GHS</span></p>
-          {totalCost > 0 && (
-            <p className="text-gray-300">
-              Total Cost: <span className={`font-semibold ${totalCost > walletBalance ? 'text-red-500' : 'text-green-400'}`}>
-                {totalCost.toFixed(2)} GHS
-              </span>
-            </p>
-          )}
-        </div>
-        
-        {totalCost > walletBalance && (
-          <div className="bg-red-900/30 border border-red-700 rounded p-2 mb-4 text-red-400 flex items-start gap-2">
-            <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
-            <p>Insufficient balance for this bulk purchase. Please add funds to your wallet.</p>
-          </div>
-        )}
-      </div>
-      
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="block text-white font-medium mb-2">Network</label>
-          <select 
-            value={bundleType}
-            onChange={(e) => setBundleType(e.target.value)}
-            className="w-full bg-gray-800 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {networkOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="mb-2">
-          <div className="flex justify-between items-center mb-2">
-            <label className="block text-white font-medium">Bulk Purchase Instructions</label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={downloadExcelTemplate}
-                className="text-blue-400 flex items-center text-sm hover:text-blue-300"
-              >
-                <FileSpreadsheet size={16} className="mr-1" />
-                Download Template
-              </button>
-              
-              <label className="text-green-400 flex items-center text-sm hover:text-green-300 cursor-pointer">
-                <Upload size={16} className="mr-1" />
-                Upload Excel
-                <input 
-                  type="file" 
-                  accept=".xlsx,.xls" 
-                  className="hidden" 
-                  onChange={handleFileUpload}
-                />
-              </label>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+              <Layers className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
             </div>
-          </div>
-          
-          <div className="bg-gray-800/50 rounded p-3 mb-2 text-gray-300 text-sm">
-            <p>Enter each purchase on a new line in the format: <span className="font-mono bg-gray-800 px-1 rounded">phone_number capacity</span></p>
-            <p className="mt-1">Phone numbers must be 10 digits starting with 0 (e.g., 0241234567)</p>
-            <p className="mt-1">Example:</p>
-            <pre className="font-mono bg-gray-800 p-2 rounded mt-1 text-gray-300">
-              {availableCapacities.length > 0 ? (
-                <>
-                  0241234567 {availableCapacities[Math.min(2, availableCapacities.length - 1)]}
-                  {'\n'}0201234567 {availableCapacities[Math.min(4, availableCapacities.length - 1)]}
-                  {'\n'}0551234567 {availableCapacities[0]}
-                </>
-              ) : (
-                <>
-                  0241234567 5
-                  {'\n'}0201234567 10
-                  {'\n'}0551234567 1
-                </>
-              )}
-            </pre>
-          </div>
-        </div>
-        
-        <div className="mb-4">
-          <textarea
-            value={bulkInput}
-            onChange={(e) => setBulkInput(e.target.value)}
-            className="w-full bg-gray-800 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-            rows={10}
-            placeholder="Enter your bulk purchase data here..."
-          />
-        </div>
-        
-        {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded p-3 mb-4 text-red-400">
-            {error}
-          </div>
-        )}
-        
-        {parsedEntries.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-white font-medium mb-2">Preview ({parsedEntries.length} orders)</h3>
-            <div className="bg-gray-800/50 rounded border border-gray-700 overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-700">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Line</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Recipient</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Capacity (GB)</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Price (GHS)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {parsedEntries.slice(0, 5).map((entry, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2 text-sm text-gray-300">{entry.lineNumber}</td>
-                      <td className="px-4 py-2 text-sm text-gray-300">{entry.recipient}</td>
-                      <td className="px-4 py-2 text-sm text-gray-300">{entry.capacity}</td>
-                      <td className="px-4 py-2 text-sm text-gray-300">{parseFloat(entry.price).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {parsedEntries.length > 5 && (
-                    <tr>
-                      <td colSpan="4" className="px-4 py-2 text-sm text-gray-400 text-center">
-                        + {parsedEntries.length - 5} more entries
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot className="bg-gray-800">
-                  <tr>
-                    <td colSpan="3" className="px-4 py-2 text-sm text-gray-300 font-medium text-right">Total:</td>
-                    <td className="px-4 py-2 text-sm text-white font-medium">{totalCost.toFixed(2)} GHS</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        )}
-        
-        <button
-          type="submit"
-          disabled={isProcessing || parsedEntries.length === 0 || totalCost > walletBalance}
-          className={`w-full py-3 rounded font-medium flex items-center justify-center ${
-            isProcessing || parsedEntries.length === 0 || totalCost > walletBalance
-              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {isProcessing ? (
-            <>Processing...</>
-          ) : (
-            <>
-              Submit Bulk Purchase
-              <ArrowRight size={18} className="ml-2" />
-            </>
-          )}
-        </button>
-      </form>
-      
-      {results && (
-        <div className="mt-6 bg-gray-800 rounded p-4">
-          <h3 className="text-lg font-medium text-white flex items-center gap-2 mb-3">
-            <Check className="text-green-400" size={20} />
-            Bulk Purchase Results
-          </h3>
-          
-          <div className="mb-4">
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-400">Total Orders:</span>
-              <span className="text-white">{results.data.totalOrders}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-400">Successful:</span>
-              <span className="text-green-400">{results.data.successful}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-400">Failed:</span>
-              <span className="text-red-400">{results.data.failed}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-gray-400">Total Amount:</span>
-              <span className="text-white">{results.data.totalAmount.toFixed(2)} GHS</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Remaining Balance:</span>
-              <span className="text-white">{results.data.newBalance.toFixed(2)} GHS</span>
-            </div>
-          </div>
-          
-          {results.data.orders && results.data.orders.length > 0 && (
             <div>
-              <h4 className="text-white font-medium mb-2">Order Details:</h4>
-              <div className="bg-gray-800/50 rounded border border-gray-700 overflow-auto max-h-96">
-                <table className="min-w-full divide-y divide-gray-700">
-                  <thead className="bg-gray-800">
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Bulk Purchase</h1>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Send data to multiple numbers at once</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        {/* Balance bar */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Wallet Balance</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{walletBalance.toFixed(2)} GHS</p>
+          </div>
+          {totalCost > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Order Total</p>
+              <p className={`text-lg font-semibold ${insufficientBalance ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                {totalCost.toFixed(2)} GHS
+              </p>
+            </div>
+          )}
+        </div>
+
+        {insufficientBalance && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-300">Insufficient balance. Please add funds to continue.</p>
+          </div>
+        )}
+
+        {/* Main form card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <form onSubmit={handleSubmit}>
+            {/* Network selector */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Network</label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <NetworkLogo type={bundleType} size={22} />
+                </div>
+                <select
+                  value={bundleType}
+                  onChange={(e) => setBundleType(e.target.value)}
+                  className="w-full pl-11 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 appearance-none transition-colors"
+                >
+                  {networkOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Instructions + actions */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Data</label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={downloadExcelTemplate} className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    Template
+                  </button>
+                  <label className="text-xs text-green-600 dark:text-green-400 hover:underline flex items-center gap-1 cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" />
+                    Upload Excel
+                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Format hint */}
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                  One order per line: <code className="bg-gray-200 dark:bg-gray-700 px-1 py-0.5 rounded text-[11px]">phone capacity</code>
+                </p>
+                <pre className="text-xs font-mono text-gray-600 dark:text-gray-400 leading-relaxed">
+{availableCapacities.length > 0
+  ? `0241234567 ${availableCapacities[Math.min(2, availableCapacities.length - 1)]}\n0201234567 ${availableCapacities[Math.min(4, availableCapacities.length - 1)]}\n0551234567 ${availableCapacities[0]}`
+  : `0241234567 5\n0201234567 10\n0551234567 1`}
+                </pre>
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                rows={8}
+                placeholder="0241234567 5&#10;0201234567 10&#10;0551234567 1"
+                className="w-full px-3.5 py-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors resize-none"
+              />
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mx-4 sm:mx-5 mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            )}
+
+            {/* Preview table */}
+            {parsedEntries.length > 0 && (
+              <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-700">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Preview
+                  <span className="ml-1.5 text-xs font-normal text-gray-400">({parsedEntries.length} orders)</span>
+                </h3>
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-gray-900/50">
+                        <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">#</th>
+                        <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">Recipient</th>
+                        <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">GB</th>
+                        <th className="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 py-2">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                      {parsedEntries.slice(0, 5).map((entry, i) => (
+                        <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
+                          <td className="px-3 py-2 text-gray-400">{entry.lineNumber}</td>
+                          <td className="px-3 py-2 font-mono text-gray-900 dark:text-white">{entry.recipient}</td>
+                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{entry.capacity}</td>
+                          <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{parseFloat(entry.price).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {parsedEntries.length > 5 && (
+                        <tr>
+                          <td colSpan="4" className="px-3 py-2 text-center text-xs text-gray-400">
+                            + {parsedEntries.length - 5} more entries
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 dark:bg-gray-900/50">
+                        <td colSpan="3" className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">Total</td>
+                        <td className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">{totalCost.toFixed(2)} GHS</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Submit */}
+            <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="submit"
+                disabled={isProcessing || parsedEntries.length === 0 || insufficientBalance}
+                className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+              >
+                {isProcessing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    Processing {parsedEntries.length} orders...
+                  </>
+                ) : (
+                  <>
+                    Submit Bulk Purchase
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Results */}
+        {results && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                  </div>
+                  Purchase Complete
+                </h3>
+                <button onClick={() => setResults(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Summary stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100 dark:divide-gray-700 border-b border-gray-100 dark:border-gray-700">
+              {[
+                { label: 'Total', value: results.data.totalOrders },
+                { label: 'Successful', value: results.data.successful, color: 'text-green-600 dark:text-green-400' },
+                { label: 'Failed', value: results.data.failed, color: 'text-red-500' },
+                { label: 'Balance', value: `${results.data.newBalance.toFixed(2)}`, suffix: ' GHS' },
+              ].map((stat, i) => (
+                <div key={i} className="p-3 sm:p-4 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">{stat.label}</p>
+                  <p className={`text-base font-semibold ${stat.color || 'text-gray-900 dark:text-white'}`}>
+                    {stat.value}{stat.suffix || ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Order details */}
+            {results.data.orders && results.data.orders.length > 0 && (
+              <div className="overflow-x-auto max-h-80">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Recipient</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Capacity</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Reference</th>
+                      <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-2">Recipient</th>
+                      <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-2">GB</th>
+                      <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-2">Status</th>
+                      <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-2">Reference</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-700">
-                    {results.data.orders.map((order, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2 text-sm text-gray-300">{order.recipient}</td>
-                        <td className="px-4 py-2 text-sm text-gray-300">{order.capacity} GB</td>
-                        <td className="px-4 py-2 text-sm">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            order.status === 'completed' 
-                              ? 'bg-green-900/50 text-green-400' 
-                              : order.status === 'processing'
-                                ? 'bg-blue-900/50 text-blue-400'
-                                : order.status === 'failed'
-                                  ? 'bg-red-900/50 text-red-400'
-                                  : 'bg-yellow-900/50 text-yellow-400'
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                    {results.data.orders.map((order, i) => (
+                      <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
+                        <td className="px-4 py-2 font-mono text-gray-900 dark:text-white">{order.recipient}</td>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{order.capacity}</td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                            order.status === 'completed' ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            order.status === 'processing' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            order.status === 'failed' ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                            'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                           }`}>
                             {order.status}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-300">{order.reference}</td>
+                        <td className="px-4 py-2 text-xs font-mono text-gray-400">{order.reference}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

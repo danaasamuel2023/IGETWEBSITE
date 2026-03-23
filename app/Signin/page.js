@@ -1,8 +1,6 @@
-// pages/auth.js
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import logo from '../../images/igetLogo - Copy.jpg'
@@ -17,105 +15,120 @@ export default function Auth() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(null);
+  const formRef = useRef(null);
+
   const router = useRouter();
 
-  // Check for dark mode on component mount and when system preference changes
+  // Rate limiting — lock after 5 failed attempts for 60s
   useEffect(() => {
-    // Check if user prefers dark mode
-    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(darkModeQuery.matches);
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const timer = setTimeout(() => setLockoutUntil(null), lockoutUntil - Date.now());
+      return () => clearTimeout(timer);
+    }
+  }, [lockoutUntil]);
 
-    // Listen for changes in system dark mode preference
-    const handleDarkModeChange = (e) => {
-      setIsDarkMode(e.matches);
-    };
-    
-    darkModeQuery.addEventListener('change', handleDarkModeChange);
-    
-    // Clean up event listener
-    return () => {
-      darkModeQuery.removeEventListener('change', handleDarkModeChange);
-    };
-  }, []);
+  const sanitizeInput = (value) => {
+    return value.replace(/[<>]/g, '').trim();
+  };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: sanitizeInput(value) }));
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (error) setError('');
   };
 
   const validateForm = () => {
-    setError('');
-    
-    if (isLogin) {
-      if (!formData.username || !formData.password) {
-        setError('Username and password are required');
-        return false;
+    const errors = {};
+
+    if (!formData.username) {
+      errors.username = 'Username is required';
+    }
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (!isLogin && formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!isLogin) {
+      if (!formData.email) {
+        errors.email = 'Email is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = 'Enter a valid email address';
       }
-    } else {
-      if (!formData.username || !formData.email || !formData.password || !formData.phone) {
-        setError('All fields are required');
-        return false;
-      }
-      
-      // Simple email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        setError('Please enter a valid email address');
-        return false;
-      }
-      
-      // Simple phone validation
-      const phoneRegex = /^\d{10,15}$/;
-      if (!phoneRegex.test(formData.phone.replace(/[^\d]/g, ''))) {
-        setError('Please enter a valid phone number');
-        return false;
+      if (!formData.phone) {
+        errors.phone = 'Phone number is required';
+      } else if (!/^\d{10,15}$/.test(formData.phone.replace(/[^\d]/g, ''))) {
+        errors.phone = 'Enter a valid phone number (10-15 digits)';
       }
     }
-    
-    return true;
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
+
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const seconds = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setError(`Too many attempts. Try again in ${seconds}s`);
       return;
     }
-    
+
+    if (!validateForm()) return;
+
     setLoading(true);
     setError('');
-    
+
     try {
-      const endpoint = isLogin ? 'https://iget.onrender.com/api/login' : 'https://iget.onrender.com/api/register';
-      
+      const endpoint = isLogin
+        ? 'https://iget.onrender.com/api/login'
+        : 'https://iget.onrender.com/api/register';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
+        signal: controller.signal,
       });
-      
+
+      clearTimeout(timeoutId);
       const data = await response.json();
-      
+
       if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        if (isLogin) {
+          const attempts = loginAttempts + 1;
+          setLoginAttempts(attempts);
+          if (attempts >= 5) {
+            setLockoutUntil(Date.now() + 60000);
+            setLoginAttempts(0);
+            throw new Error('Too many failed attempts. Account locked for 60 seconds.');
+          }
+        }
+        throw new Error(data.message || 'Authentication failed');
       }
-      
-      // Store token and user data in localStorage
+
+      setLoginAttempts(0);
       localStorage.setItem('igettoken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
-      
-      // Redirect to dashboard
       router.push('/');
-      
-    } catch (error) {
-      setError(error.message);
-      console.error('Authentication error:', error);
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Check your connection and try again.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -124,82 +137,48 @@ export default function Auth() {
   const toggleAuthMode = () => {
     setIsLogin(!isLogin);
     setError('');
+    setFieldErrors({});
+    setFormData({ username: '', email: '', password: '', phone: '' });
   };
 
-  // Updated classes to extend container to edges and match the black navbar
-  // Removed min-h-screen from pageClass and added it to containerClass
-  const containerClass = isDarkMode 
-    ? "min-h-screen bg-gray-900 flex flex-col pt-0" 
-    : "min-h-screen bg-white flex flex-col pt-0";
-  
-  const pageClass = "flex-grow flex items-center justify-center";
-    
-  const cardClass = isDarkMode
-    ? "bg-gray-800 p-8 rounded-lg shadow-md w-full max-w-md"
-    : "bg-white p-8 rounded-lg shadow-md w-full max-w-md";
-    
-  const headingClass = isDarkMode
-    ? "text-2xl font-bold text-center mb-6 text-white"
-    : "text-2xl font-bold text-center mb-6 text-gray-900";
-    
-  const labelClass = isDarkMode
-    ? "block text-white font-medium mb-2"
-    : "block text-gray-800 font-medium mb-2";
-    
-  const inputClass = isDarkMode
-    ? "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white border-gray-600 placeholder-gray-400"
-    : "w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300 text-gray-900 placeholder-gray-500";
-    
-  const errorClass = isDarkMode
-    ? "bg-red-900 text-white p-3 rounded mb-4 font-medium"
-    : "bg-red-100 text-red-800 p-3 rounded mb-4 font-medium";
-    
-  const linkTextClass = isDarkMode
-    ? "text-blue-400 hover:underline font-medium"
-    : "text-blue-600 hover:underline font-medium";
-    
-  const paragraphClass = isDarkMode
-    ? "text-white"
-    : "text-gray-700";
-
-  const buttonClass = "w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200 font-medium";
+  const isLocked = lockoutUntil && Date.now() < lockoutUntil;
 
   return (
-    <div className={containerClass}>
-      <Head>
-        <title>{isLogin ? 'Login' : 'Sign Up'} | IGet</title>
-        <meta name="description" content="Authentication page" />
-      </Head>
-      
-      <div className={pageClass}>
-        <div className={cardClass}>
-          <div className="flex justify-center mb-6">
-            {/* Company Logo */}
-            <div className="relative w-48 h-16">
-              <Image 
-                src={logo} 
-                alt="Iget Logo" 
-                layout="fill"
-                objectFit="contain"
-                priority
-              />
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-slate-900 flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <div className="relative w-44 h-14">
+            <Image
+              src={logo}
+              alt="iGet Logo"
+              fill
+              style={{ objectFit: 'contain' }}
+              priority
+            />
           </div>
+        </div>
 
-          <h1 className={headingClass}>
-            {isLogin ? 'Login to Your Account' : 'Create an Account'}
+        {/* Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 p-8">
+          <h1 className="text-2xl font-semibold text-center text-gray-900 dark:text-white mb-1">
+            {isLogin ? 'Welcome back' : 'Get started'}
           </h1>
-          
+          <p className="text-center text-gray-500 dark:text-gray-400 text-sm mb-6">
+            {isLogin ? 'Sign in to your account' : 'Create your account to continue'}
+          </p>
+
           {error && (
-            <div className={errorClass}>
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm mb-5">
               {error}
             </div>
           )}
-          
-          <form onSubmit={handleSubmit}>
+
+          <form ref={formRef} onSubmit={handleSubmit} noValidate>
+            {/* Username */}
             <div className="mb-4">
-              <label htmlFor="username" className={labelClass}>
-                Username or Email
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                {isLogin ? 'Username or Email' : 'Full Name'}
               </label>
               <input
                 type="text"
@@ -207,15 +186,20 @@ export default function Auth() {
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={inputClass}
-                placeholder="Enter your FullName"
+                autoComplete={isLogin ? 'username' : 'name'}
+                className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors ${
+                  fieldErrors.username ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-600'
+                }`}
+                placeholder={isLogin ? 'Enter username or email' : 'Enter your full name'}
               />
+              {fieldErrors.username && <p className="text-red-500 text-xs mt-1">{fieldErrors.username}</p>}
             </div>
-            
+
+            {/* Email + Phone (signup only) */}
             {!isLogin && (
               <>
                 <div className="mb-4">
-                  <label htmlFor="email" className={labelClass}>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     Email
                   </label>
                   <input
@@ -224,13 +208,17 @@ export default function Auth() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={inputClass}
-                    placeholder="Enter your email"
+                    autoComplete="email"
+                    className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors ${
+                      fieldErrors.email ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-600'
+                    }`}
+                    placeholder="you@example.com"
                   />
+                  {fieldErrors.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>}
                 </div>
-                
+
                 <div className="mb-4">
-                  <label htmlFor="phone" className={labelClass}>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     Phone Number
                   </label>
                   <input
@@ -239,68 +227,95 @@ export default function Auth() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={inputClass}
-                    placeholder="Enter your phone number"
+                    autoComplete="tel"
+                    className={`w-full px-3.5 py-2.5 rounded-lg border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors ${
+                      fieldErrors.phone ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-600'
+                    }`}
+                    placeholder="0241234567"
                   />
+                  {fieldErrors.phone && <p className="text-red-500 text-xs mt-1">{fieldErrors.phone}</p>}
                 </div>
               </>
             )}
-            
-            <div className="mb-6">
-              <label htmlFor="password" className={labelClass}>
+
+            {/* Password */}
+            <div className="mb-5">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="Enter your password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  className={`w-full px-3.5 py-2.5 pr-10 rounded-lg border bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors ${
+                    fieldErrors.password ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-600'
+                  }`}
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.05 6.05m7.875 7.875l3.875 3.875M3 3l18 18" /></svg>
+                  ) : (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  )}
+                </button>
+              </div>
+              {fieldErrors.password && <p className="text-red-500 text-xs mt-1">{fieldErrors.password}</p>}
             </div>
-            
+
+            {/* Submit */}
             <button
               type="submit"
-              className={buttonClass}
-              disabled={loading}
+              disabled={loading || isLocked}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
             >
               {loading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                  {isLogin ? 'Signing in...' : 'Creating account...'}
                 </span>
+              ) : isLocked ? (
+                'Temporarily locked'
               ) : (
-                isLogin ? 'Login' : 'Sign Up'
+                isLogin ? 'Sign in' : 'Create account'
               )}
             </button>
-            
+
             {isLogin && (
-              <div className="mt-4 text-center">
-                <Link href="/forgot-password" className={linkTextClass}>
+              <div className="mt-3 text-center">
+                <Link href="/forgot-password" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                   Forgot password?
                 </Link>
               </div>
             )}
           </form>
-          
-          <div className="mt-6 text-center">
-            <p className={paragraphClass}>
-              {isLogin ? "Don't have an account?" : "Already have an account?"}
+
+          <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-700 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {isLogin ? "Don't have an account?" : 'Already have an account?'}
               <button
                 type="button"
                 onClick={toggleAuthMode}
-                className={`ml-2 ${linkTextClass}`}
+                className="ml-1.5 text-blue-600 dark:text-blue-400 font-medium hover:underline"
               >
-                {isLogin ? 'Sign Up' : 'Login'}
+                {isLogin ? 'Sign up' : 'Sign in'}
               </button>
             </p>
           </div>
         </div>
+
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
+          Secured with end-to-end encryption
+        </p>
       </div>
     </div>
   );
