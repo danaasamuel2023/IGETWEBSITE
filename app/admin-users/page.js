@@ -21,6 +21,9 @@ export default function UsersManagement() {
   const [modalType, setModalType] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [newRole, setNewRole] = useState('user');
+  const [newPassword, setNewPassword] = useState('');
+  const [notifyUserOnReset, setNotifyUserOnReset] = useState(false);
+  const [resetResult, setResetResult] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
@@ -345,6 +348,11 @@ export default function UsersManagement() {
       setError('You do not have permission to change user roles.');
       return;
     }
+
+    if (type === 'resetPassword' && !adminPermissions.canChangeRoles) {
+      setError('You do not have permission to reset user passwords.');
+      return;
+    }
     
     if (type === 'deleteUser' && !adminPermissions.canDeleteUsers) {
       setError('You do not have permission to delete users.');
@@ -386,6 +394,10 @@ export default function UsersManagement() {
       setApprovalReason('');
     } else if (type === 'rejectUser') {
       setRejectionReason('');
+    } else if (type === 'resetPassword') {
+      setNewPassword('');
+      setNotifyUserOnReset(false);
+      setResetResult(null);
     }
   };
 
@@ -401,6 +413,9 @@ export default function UsersManagement() {
     setShowTransactionHistory(false);
     setApprovalReason('');
     setRejectionReason('');
+    setNewPassword('');
+    setNotifyUserOnReset(false);
+    setResetResult(null);
   };
 
   // NEW: Handle user approval
@@ -648,6 +663,38 @@ export default function UsersManagement() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to change user role');
       console.error('Error changing role:', err);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    if (e) e.preventDefault();
+
+    // If admin typed a password, enforce a minimum length client-side
+    if (newPassword && newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `https://iget.onrender.com/api/admin/users/${selectedUser._id}/reset-password`,
+        {
+          newPassword: newPassword || undefined,
+          notifyUser: notifyUserOnReset
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('igettoken')}`
+          }
+        }
+      );
+
+      // Keep the modal open to display the generated temporary password (if any)
+      setResetResult(res.data?.data || { username: selectedUser.username });
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reset password');
+      console.error('Error resetting password:', err);
     }
   };
 
@@ -1101,10 +1148,17 @@ const getRoleDisplayName = (role) => {
                             )}
                             
                             {adminPermissions.canChangeRoles && (
-                              <button 
+                              <button
                                 onClick={() => handleOpenModal('changeRole', user)}
                                 className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800">
                                 Change Role
+                              </button>
+                            )}
+                            {adminPermissions.canChangeRoles && (
+                              <button
+                                onClick={() => handleOpenModal('resetPassword', user)}
+                                className="text-teal-600 hover:text-teal-900 bg-teal-50 px-2 py-1 rounded dark:bg-teal-900 dark:text-teal-200 dark:hover:bg-teal-800">
+                                Reset Password
                               </button>
                             )}
                             {adminPermissions.canChangeUserStatus && (
@@ -1427,6 +1481,68 @@ const getRoleDisplayName = (role) => {
                       </div>
                     )}
 
+                    {modalType === 'resetPassword' && (
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Reset User Password</h3>
+                        <div className="mt-2">
+                          {!resetResult ? (
+                            <form onSubmit={handleResetPassword}>
+                              <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
+                                Reset the password for "{selectedUser.username}". Leave the field blank to auto-generate a strong temporary password.
+                              </p>
+                              <div className="mb-4">
+                                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  New password (optional)
+                                </label>
+                                <input
+                                  id="newPassword"
+                                  type="text"
+                                  autoComplete="new-password"
+                                  placeholder="Leave blank to auto-generate"
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                  value={newPassword}
+                                  onChange={(e) => setNewPassword(e.target.value)}
+                                />
+                              </div>
+                              <div className="flex items-center">
+                                <input
+                                  id="notifyUserOnReset"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                  checked={notifyUserOnReset}
+                                  onChange={(e) => setNotifyUserOnReset(e.target.checked)}
+                                />
+                                <label htmlFor="notifyUserOnReset" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                  Notify the user by SMS (does not include the password)
+                                </label>
+                              </div>
+                            </form>
+                          ) : (
+                            <div className="mt-2">
+                              <p className="text-sm text-green-700 dark:text-green-300 mb-3">
+                                Password reset successfully for "{resetResult.username || selectedUser.username}".
+                              </p>
+                              {resetResult.temporaryPassword ? (
+                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Temporary password (share securely):</p>
+                                  <code className="text-base font-mono font-semibold text-gray-900 dark:text-white break-all">
+                                    {resetResult.temporaryPassword}
+                                  </code>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-300">
+                                  The new password you set is now active.
+                                </p>
+                              )}
+                              {resetResult.userNotified && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">The user was notified by SMS.</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {modalType === 'transactions' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                         <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
@@ -1634,6 +1750,27 @@ const getRoleDisplayName = (role) => {
                         onClick={handleCloseModal}
                       >
                         Cancel
+                      </button>
+                    </>
+                  )}
+
+                  {modalType === 'resetPassword' && (
+                    <>
+                      {!resetResult && (
+                        <button
+                          type="button"
+                          className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-teal-600 text-base font-medium text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:ml-3 sm:w-auto sm:text-sm"
+                          onClick={handleResetPassword}
+                        >
+                          Reset Password
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
+                        onClick={handleCloseModal}
+                      >
+                        {resetResult ? 'Close' : 'Cancel'}
                       </button>
                     </>
                   )}
