@@ -24,6 +24,10 @@ export default function UsersManagement() {
   const [newPassword, setNewPassword] = useState('');
   const [notifyUserOnReset, setNotifyUserOnReset] = useState(false);
   const [resetResult, setResetResult] = useState(null);
+  const [webhookUrlInput, setWebhookUrlInput] = useState('');
+  const [webhookData, setWebhookData] = useState(null);
+  const [webhookResult, setWebhookResult] = useState(null);
+  const [webhookLoading, setWebhookLoading] = useState(false);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [transactionLoading, setTransactionLoading] = useState(false);
@@ -353,6 +357,11 @@ export default function UsersManagement() {
       setError('You do not have permission to reset user passwords.');
       return;
     }
+
+    if (type === 'webhook' && !adminPermissions.canChangeRoles) {
+      setError('You do not have permission to manage user webhooks.');
+      return;
+    }
     
     if (type === 'deleteUser' && !adminPermissions.canDeleteUsers) {
       setError('You do not have permission to delete users.');
@@ -398,6 +407,11 @@ export default function UsersManagement() {
       setNewPassword('');
       setNotifyUserOnReset(false);
       setResetResult(null);
+    } else if (type === 'webhook') {
+      setWebhookUrlInput('');
+      setWebhookData(null);
+      setWebhookResult(null);
+      fetchUserWebhook(user._id);
     }
   };
 
@@ -416,6 +430,9 @@ export default function UsersManagement() {
     setNewPassword('');
     setNotifyUserOnReset(false);
     setResetResult(null);
+    setWebhookUrlInput('');
+    setWebhookData(null);
+    setWebhookResult(null);
   };
 
   // NEW: Handle user approval
@@ -695,6 +712,60 @@ export default function UsersManagement() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to reset password');
       console.error('Error resetting password:', err);
+    }
+  };
+
+  const fetchUserWebhook = async (userId) => {
+    setWebhookLoading(true);
+    try {
+      const res = await axios.get(`https://iget.onrender.com/api/admin/users/${userId}/webhook`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('igettoken')}` }
+      });
+      const data = res.data?.data || null;
+      setWebhookData(data);
+      setWebhookUrlInput(data?.webhookUrl || '');
+    } catch (err) {
+      console.error('Error fetching user webhook:', err);
+      setWebhookData(null);
+    } finally {
+      setWebhookLoading(false);
+    }
+  };
+
+  const handleSetWebhook = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!/^https?:\/\//i.test(webhookUrlInput)) {
+      setError('Enter a valid http(s) URL');
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `https://iget.onrender.com/api/admin/users/${selectedUser._id}/webhook`,
+        { url: webhookUrlInput },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('igettoken')}` } }
+      );
+      setWebhookResult(res.data?.data || { webhookUrl: webhookUrlInput });
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save webhook');
+      console.error('Error saving webhook:', err);
+    }
+  };
+
+  const handleDeleteWebhook = async () => {
+    try {
+      await axios.delete(`https://iget.onrender.com/api/admin/users/${selectedUser._id}/webhook`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('igettoken')}` }
+      });
+      setWebhookData(null);
+      setWebhookUrlInput('');
+      setWebhookResult({ removed: true });
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove webhook');
+      console.error('Error removing webhook:', err);
     }
   };
 
@@ -1161,6 +1232,13 @@ const getRoleDisplayName = (role) => {
                                 Reset Password
                               </button>
                             )}
+                            {adminPermissions.canChangeRoles && (
+                              <button
+                                onClick={() => handleOpenModal('webhook', user)}
+                                className="text-cyan-600 hover:text-cyan-900 bg-cyan-50 px-2 py-1 rounded dark:bg-cyan-900 dark:text-cyan-200 dark:hover:bg-cyan-800">
+                                Webhook
+                              </button>
+                            )}
                             {adminPermissions.canChangeUserStatus && (
                               <button 
                                 onClick={() => handleOpenModal('toggleStatus', user)}
@@ -1543,6 +1621,63 @@ const getRoleDisplayName = (role) => {
                       </div>
                     )}
 
+                    {modalType === 'webhook' && (
+                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Delivery-Status Webhook</h3>
+                        <div className="mt-2">
+                          {!webhookResult ? (
+                            <form onSubmit={handleSetWebhook}>
+                              <p className="text-sm text-gray-500 dark:text-gray-300 mb-4">
+                                Set the URL where iGet POSTs delivery-status updates for "{selectedUser.username}"'s API orders.
+                              </p>
+                              {webhookLoading ? (
+                                <p className="text-sm text-gray-400 mb-2">Loading current webhook…</p>
+                              ) : webhookData?.webhookUrl ? (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                  Current: <code className="break-all">{webhookData.webhookUrl}</code>
+                                  {webhookData.hasSecret ? ' (signing secret set)' : ''}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">No webhook configured yet.</p>
+                              )}
+                              <div className="mb-2">
+                                <label htmlFor="webhookUrlInput" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  Webhook URL
+                                </label>
+                                <input
+                                  id="webhookUrlInput"
+                                  type="url"
+                                  placeholder="https://example.com/webhooks/iget"
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                  value={webhookUrlInput}
+                                  onChange={(e) => setWebhookUrlInput(e.target.value)}
+                                />
+                              </div>
+                              <p className="text-xs text-gray-400">
+                                Payloads are signed with HMAC-SHA256 in the <code>X-Iget-Signature</code> header.
+                              </p>
+                            </form>
+                          ) : webhookResult.removed ? (
+                            <p className="text-sm text-green-700 dark:text-green-300">Webhook removed successfully.</p>
+                          ) : (
+                            <div>
+                              <p className="text-sm text-green-700 dark:text-green-300 mb-3">Webhook saved.</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">URL:</p>
+                              <code className="text-sm break-all text-gray-900 dark:text-white">{webhookResult.webhookUrl}</code>
+                              {webhookResult.webhookSecret && (
+                                <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 mt-3">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Signing secret (shown once — share securely):</p>
+                                  <code className="text-sm font-mono font-semibold text-gray-900 dark:text-white break-all">
+                                    {webhookResult.webhookSecret}
+                                  </code>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {modalType === 'transactions' && (
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                         <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
@@ -1771,6 +1906,36 @@ const getRoleDisplayName = (role) => {
                         onClick={handleCloseModal}
                       >
                         {resetResult ? 'Close' : 'Cancel'}
+                      </button>
+                    </>
+                  )}
+
+                  {modalType === 'webhook' && (
+                    <>
+                      {!webhookResult && (
+                        <button
+                          type="button"
+                          className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-cyan-600 text-base font-medium text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 sm:ml-3 sm:w-auto sm:text-sm"
+                          onClick={handleSetWebhook}
+                        >
+                          Save Webhook
+                        </button>
+                      )}
+                      {!webhookResult && webhookData?.webhookUrl && (
+                        <button
+                          type="button"
+                          className="mt-3 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                          onClick={handleDeleteWebhook}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500"
+                        onClick={handleCloseModal}
+                      >
+                        {webhookResult ? 'Close' : 'Cancel'}
                       </button>
                     </>
                   )}
