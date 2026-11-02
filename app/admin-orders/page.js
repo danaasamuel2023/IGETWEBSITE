@@ -6,6 +6,40 @@ import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
 import { Phone, User, Search, AlertCircle, CheckCircle, RefreshCw, ExternalLink } from 'lucide-react';
 
+const HUBNET_STATES = {
+  queued: { label: 'Hubnet: queued', className: 'text-gray-500 dark:text-gray-400' },
+  submitting: { label: 'Hubnet: sending…', className: 'text-blue-600 dark:text-blue-400' },
+  submitted: { label: 'Hubnet: sent', className: 'text-green-600 dark:text-green-400' },
+  failed: { label: 'Hubnet: rejected', className: 'text-red-600 dark:text-red-400' },
+  unknown: { label: 'Hubnet: unclear — check Hubnet', className: 'text-amber-600 dark:text-amber-400' }
+};
+
+// Background Hubnet submission status for an order, with a retry button on failure
+function HubnetSubmissionInfo({ submission, canRetry, retrying, onRetry }) {
+  const info = HUBNET_STATES[submission.state] || { label: `Hubnet: ${submission.state}`, className: 'text-gray-500' };
+  const showRetry = canRetry && (submission.state === 'failed' || submission.state === 'unknown');
+  return (
+    <div className="mt-1 max-w-[220px] whitespace-normal">
+      <p className={`text-xs font-medium ${info.className}`}>
+        {info.label}{submission.attempts > 1 ? ` (${submission.attempts} tries)` : ''}
+      </p>
+      {submission.lastError && submission.state !== 'submitted' && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 break-words">{submission.lastError}</p>
+      )}
+      {showRetry && (
+        <button
+          onClick={onRetry}
+          disabled={retrying}
+          className="mt-1 text-xs px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 disabled:opacity-50 inline-flex items-center gap-1"
+        >
+          <RefreshCw className={`h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
+          {retrying ? 'Retrying…' : 'Retry Hubnet'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function OrdersManagement() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -24,6 +58,7 @@ export default function OrdersManagement() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrders, setSelectedOrders] = useState([]);
+  const [retryingHubnet, setRetryingHubnet] = useState(null);
   const [bulkStatus, setBulkStatus] = useState('');
   const [itemsPerPage] = useState(20);
   const [senderID, setSenderID] = useState('EL VENDER');
@@ -510,6 +545,42 @@ export default function OrdersManagement() {
       setError(err.response?.data?.message || 'Failed to update order status');
       console.error('Error updating order status:', err);
     }
+  };
+
+  // Resend a pending Telecel order to Hubnet after a failed or unclear attempt
+  const handleHubnetRetry = async (order, force = false) => {
+    const url = `https://iget.onrender.com/api/orders/${order._id}/hubnet-retry`;
+    try {
+      setError(null);
+      setRetryingHubnet(order._id);
+      const response = await axios.post(url, { force }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('igettoken')}` }
+      });
+      applyHubnetState(order._id, response.data.hubnetState, response.data.lastError);
+      setUpdateSuccessMessage(`Order ${order.orderReference || order._id.substring(0, 8)} sent to Hubnet`);
+    } catch (err) {
+      const data = err.response?.data;
+      if (err.response?.status === 409 && data?.lastError !== undefined && !force) {
+        // Unclear last attempt: Hubnet may already have delivered it
+        if (window.confirm(`${data.message}\n\nLast error: ${data.lastError}\n\nResend anyway?`)) {
+          setRetryingHubnet(null);
+          return handleHubnetRetry(order, true);
+        }
+      } else {
+        if (data?.hubnetState) applyHubnetState(order._id, data.hubnetState, data.lastError);
+        setError(data?.message || 'Hubnet retry failed');
+      }
+    } finally {
+      setRetryingHubnet(null);
+    }
+  };
+
+  const applyHubnetState = (orderId, state, lastError) => {
+    const update = (list) => list.map(o => o._id === orderId
+      ? { ...o, hubnetSubmission: { ...o.hubnetSubmission, state, lastError, attempts: (o.hubnetSubmission?.attempts || 0) + 1 } }
+      : o);
+    setOrders(update);
+    setFilteredOrders(update);
   };
 
   // Optimized bulk status change using the new endpoint
@@ -1366,6 +1437,14 @@ export default function OrdersManagement() {
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 {externalStatus.message}
                               </p>
+                            )}
+                            {order.hubnetSubmission?.state && (
+                              <HubnetSubmissionInfo
+                                submission={order.hubnetSubmission}
+                                canRetry={order.status === 'pending'}
+                                retrying={retryingHubnet === order._id}
+                                onRetry={() => handleHubnetRetry(order)}
+                              />
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
