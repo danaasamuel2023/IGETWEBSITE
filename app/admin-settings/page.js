@@ -6,9 +6,15 @@ import AdminLayout from '@/components/adminWraper';
 
 const API_BASE = 'https://iget.onrender.com/api/admin/settings';
 
+const API_TOGGLES = {
+  mtn: { endpoint: 'toggle-mtn-api', key: 'mtnHubnetEnabled', label: 'MTN Hubnet' },
+  at: { endpoint: 'toggle-at-api', key: 'atHubnetEnabled', label: 'AT-ishare Hubnet' },
+  telecel: { endpoint: 'toggle-telecel-api', key: 'telecelHubnetEnabled', label: 'Telecel Hubnet' }
+};
+
 export default function ApiSettingsPage() {
   const [settings, setSettings] = useState({
-    apiIntegrations: { mtnHubnetEnabled: true, atHubnetEnabled: true },
+    apiIntegrations: { mtnHubnetEnabled: true, atHubnetEnabled: true, telecelHubnetEnabled: false },
     notifications: { smsEnabled: true, emailEnabled: true }
   });
   const [loading, setLoading] = useState(true);
@@ -77,7 +83,7 @@ export default function ApiSettingsPage() {
       setUpdating(type);
       setError(null);
       const token = getToken();
-      const endpoint = type === 'mtn' ? 'toggle-mtn-api' : 'toggle-at-api';
+      const { endpoint, key, label } = API_TOGGLES[type];
 
       const response = await fetch(`${API_BASE}/${endpoint}`, {
         method: 'PUT',
@@ -95,14 +101,10 @@ export default function ApiSettingsPage() {
           ...prev,
           apiIntegrations: {
             ...prev.apiIntegrations,
-            ...(type === 'mtn'
-              ? { mtnHubnetEnabled: data.data.mtnHubnetEnabled }
-              : { atHubnetEnabled: data.data.atHubnetEnabled })
+            [key]: data.data[key]
           }
         }));
-        const label = type === 'mtn' ? 'MTN Hubnet' : 'AT-ishare Hubnet';
-        const enabled = type === 'mtn' ? data.data.mtnHubnetEnabled : data.data.atHubnetEnabled;
-        showSuccess(`${label} API ${enabled ? 'enabled' : 'disabled'}`);
+        showSuccess(`${label} API ${data.data[key] ? 'enabled' : 'disabled'}`);
       }
     } catch (err) {
       setError(err.message);
@@ -269,6 +271,31 @@ export default function ApiSettingsPage() {
                     onToggle={() => toggleApi('at')}
                     loading={updating === 'at'}
                     label="Toggle AT API"
+                  />
+                </div>
+
+                {/* Telecel Toggle */}
+                <div className="px-5 py-4 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Telecel Bundle API</h3>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                        settings.apiIntegrations?.telecelHubnetEnabled
+                          ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                      }`}>
+                        {settings.apiIntegrations?.telecelHubnetEnabled ? 'On' : 'Off'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Automatically process Telecel orders through Hubnet
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    enabled={settings.apiIntegrations?.telecelHubnetEnabled}
+                    onToggle={() => toggleApi('telecel')}
+                    loading={updating === 'telecel'}
+                    label="Toggle Telecel API"
                   />
                 </div>
               </div>
