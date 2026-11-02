@@ -144,6 +144,21 @@ export default function TelecelPortalPage() {
     });
   };
   const syncNow = () => run('sync', () => call('POST', '/sync'));
+
+  // Same switch as "Telecel via Our Portal" on API Configure
+  const toggleDelivery = () => {
+    if (data?.laneEnabled && !window.confirm('Turn off Telecel portal delivery? New Telecel orders will go to Editors instead.')) return;
+    run('toggle', async () => {
+      const token = localStorage.getItem('igettoken');
+      const res = await fetch('https://iget.onrender.com/api/admin/settings/toggle-telecel-portal', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.success === false) throw new Error(json.message || `Request failed (${res.status})`);
+      return { message: json.warning ? `${json.message}. ${json.warning}` : json.message };
+    });
+  };
   const setPackStatus = (packId, status) => run(`pack-${packId}`, () => call('PATCH', `/packs/${encodeURIComponent(packId)}`, { status }));
 
   const session = data?.session;
@@ -160,15 +175,34 @@ export default function TelecelPortalPage() {
               Deliver Telecel orders from iGet&apos;s own Telecel Bundle Sharer account.
             </p>
           </div>
-          {data && (
-            <a href="/admin-settings" className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium ${
-              data.laneEnabled ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-            }`}>
-              <span className={`h-2 w-2 rounded-full ${data.laneEnabled ? 'bg-green-500' : 'bg-gray-400'}`} />
-              {data.laneEnabled ? 'Delivery is ON' : 'Delivery is OFF — turn on in API Configure'}
-            </a>
-          )}
         </div>
+
+        {data && (
+          <section className={`${card} px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+            <div className="flex items-start gap-3">
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${data.laneEnabled ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Telecel delivery through the portal is {data.laneEnabled ? 'ON' : 'OFF'}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {data.laneEnabled
+                    ? 'New Telecel orders are sent automatically from this account.'
+                    : !data.config.configured
+                      ? 'Fill in the portal account below first, then turn it on.'
+                      : 'Turning it on sends new Telecel orders automatically and turns Telecel Hubnet off.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={toggleDelivery}
+              disabled={busy === 'toggle' || (!data.laneEnabled && !data.config.configured)}
+              className={`${data.laneEnabled ? btnSecondary : btnPrimary} w-full sm:w-auto py-2.5`}
+            >
+              {busy === 'toggle' ? 'Saving…' : data.laneEnabled ? 'Turn off' : 'Turn on delivery'}
+            </button>
+          </section>
+        )}
 
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-sm text-red-700 dark:text-red-300 flex justify-between gap-3">
