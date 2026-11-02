@@ -9,12 +9,13 @@ const API_BASE = 'https://iget.onrender.com/api/admin/settings';
 const API_TOGGLES = {
   mtn: { endpoint: 'toggle-mtn-api', key: 'mtnHubnetEnabled', label: 'MTN Hubnet' },
   at: { endpoint: 'toggle-at-api', key: 'atHubnetEnabled', label: 'AT-ishare Hubnet' },
-  telecel: { endpoint: 'toggle-telecel-api', key: 'telecelHubnetEnabled', label: 'Telecel Hubnet' }
+  telecel: { endpoint: 'toggle-telecel-api', key: 'telecelHubnetEnabled', label: 'Telecel Hubnet' },
+  telecelPortal: { endpoint: 'toggle-telecel-portal', key: 'telecelPortalEnabled', label: 'Telecel portal delivery' }
 };
 
 export default function ApiSettingsPage() {
   const [settings, setSettings] = useState({
-    apiIntegrations: { mtnHubnetEnabled: true, atHubnetEnabled: true, telecelHubnetEnabled: false },
+    apiIntegrations: { mtnHubnetEnabled: true, atHubnetEnabled: true, telecelHubnetEnabled: false, telecelPortalEnabled: false },
     notifications: { smsEnabled: true, emailEnabled: true }
   });
   const [loading, setLoading] = useState(true);
@@ -95,18 +96,16 @@ export default function ApiSettingsPage() {
         }
       });
 
-      if (!response.ok) throw new Error(`Update failed (${response.status})`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || `Update failed (${response.status})`);
 
-      const data = await response.json();
       if (data.success) {
+        // Response may change more than one switch (Telecel Hubnet and portal are exclusive)
         setSettings(prev => ({
           ...prev,
-          apiIntegrations: {
-            ...prev.apiIntegrations,
-            [key]: data.data[key]
-          }
+          apiIntegrations: { ...prev.apiIntegrations, ...data.data }
         }));
-        showSuccess(`${label} API ${data.data[key] ? 'enabled' : 'disabled'}`);
+        showSuccess(`${label} ${data.data[key] ? 'enabled' : 'disabled'}${data.warning ? ' — ' + data.warning : ''}`);
       }
     } catch (err) {
       setError(err.message);
@@ -298,6 +297,33 @@ export default function ApiSettingsPage() {
                     onToggle={() => toggleApi('telecel')}
                     loading={updating === 'telecel'}
                     label="Toggle Telecel API"
+                  />
+                </div>
+
+                {/* Telecel portal toggle */}
+                <div className="px-5 py-4 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Telecel via Our Portal</h3>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                        settings.apiIntegrations?.telecelPortalEnabled
+                          ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                      }`}>
+                        {settings.apiIntegrations?.telecelPortalEnabled ? 'On' : 'Off'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Deliver Telecel orders from iGet&apos;s own Telecel account. Turns Telecel Hubnet off.
+                      Set up and log in on the{' '}
+                      <a href="/telecel_services" className="text-blue-600 dark:text-blue-400 hover:underline">Telecel Auto</a> page.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    enabled={settings.apiIntegrations?.telecelPortalEnabled}
+                    onToggle={() => toggleApi('telecelPortal')}
+                    loading={updating === 'telecelPortal'}
+                    label="Toggle Telecel portal delivery"
                   />
                 </div>
               </div>

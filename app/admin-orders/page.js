@@ -6,24 +6,40 @@ import AdminLayout from '@/components/adminWraper';
 import * as XLSX from 'xlsx';
 import { Phone, User, Search, AlertCircle, CheckCircle, RefreshCw, ExternalLink } from 'lucide-react';
 
-const HUBNET_STATES = {
-  queued: { label: 'Hubnet: queued', className: 'text-gray-500 dark:text-gray-400' },
-  submitting: { label: 'Hubnet: sending…', className: 'text-blue-600 dark:text-blue-400' },
-  submitted: { label: 'Hubnet: sent', className: 'text-green-600 dark:text-green-400' },
-  failed: { label: 'Hubnet: rejected', className: 'text-red-600 dark:text-red-400' },
-  unknown: { label: 'Hubnet: unclear — check Hubnet', className: 'text-amber-600 dark:text-amber-400' }
+const GRAY = 'text-gray-500 dark:text-gray-400';
+const BLUE = 'text-blue-600 dark:text-blue-400';
+const GREEN = 'text-green-600 dark:text-green-400';
+const RED = 'text-red-600 dark:text-red-400';
+const AMBER = 'text-amber-600 dark:text-amber-400';
+
+const SUBMISSION_STATES = {
+  hubnet: {
+    queued: { label: 'Hubnet: queued', className: GRAY },
+    submitting: { label: 'Hubnet: sending…', className: BLUE },
+    submitted: { label: 'Hubnet: sent', className: GREEN },
+    failed: { label: 'Hubnet: rejected', className: RED },
+    unknown: { label: 'Hubnet: unclear — check Hubnet', className: AMBER }
+  },
+  portal: {
+    queued: { label: 'Portal: waiting to send', className: GRAY },
+    sending: { label: 'Portal: sending…', className: BLUE },
+    sent: { label: 'Portal: delivered', className: GREEN },
+    failed: { label: 'Portal: rejected', className: RED },
+    unknown: { label: 'Portal: unclear — check the portal', className: AMBER }
+  }
 };
 
-// Background Hubnet submission status for an order, with a retry button on failure
-function HubnetSubmissionInfo({ submission, canRetry, retrying, onRetry }) {
-  const info = HUBNET_STATES[submission.state] || { label: `Hubnet: ${submission.state}`, className: 'text-gray-500' };
+// Background Hubnet / Telecel portal submission status for an order, with a retry button on failure
+function HubnetSubmissionInfo({ provider = 'hubnet', submission, canRetry, retrying, onRetry }) {
+  const name = provider === 'portal' ? 'Portal' : 'Hubnet';
+  const info = SUBMISSION_STATES[provider][submission.state] || { label: `${name}: ${submission.state}`, className: GRAY };
   const showRetry = canRetry && (submission.state === 'failed' || submission.state === 'unknown');
   return (
     <div className="mt-1 max-w-[220px] whitespace-normal">
       <p className={`text-xs font-medium ${info.className}`}>
         {info.label}{submission.attempts > 1 ? ` (${submission.attempts} tries)` : ''}
       </p>
-      {submission.lastError && submission.state !== 'submitted' && (
+      {submission.lastError && !['submitted', 'sent'].includes(submission.state) && (
         <p className="text-xs text-gray-500 dark:text-gray-400 break-words">{submission.lastError}</p>
       )}
       {showRetry && (
@@ -33,7 +49,7 @@ function HubnetSubmissionInfo({ submission, canRetry, retrying, onRetry }) {
           className="mt-1 text-xs px-2 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 disabled:opacity-50 inline-flex items-center gap-1"
         >
           <RefreshCw className={`h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
-          {retrying ? 'Retrying…' : 'Retry Hubnet'}
+          {retrying ? 'Retrying…' : `Retry ${name}`}
         </button>
       )}
     </div>
@@ -547,37 +563,46 @@ export default function OrdersManagement() {
     }
   };
 
-  // Resend a pending Telecel order to Hubnet after a failed or unclear attempt
-  const handleHubnetRetry = async (order, force = false) => {
-    const url = `https://iget.onrender.com/api/orders/${order._id}/hubnet-retry`;
+  // Resend a pending Telecel order (Hubnet or our Telecel portal) after a failed or unclear attempt
+  const handleHubnetRetry = async (order, force = false, provider = 'hubnet') => {
+    const isPortal = provider === 'portal';
+    const url = `https://iget.onrender.com/api/orders/${order._id}/${isPortal ? 'portal-retry' : 'hubnet-retry'}`;
+    const ref = order.orderReference || order._id.substring(0, 8);
     try {
       setError(null);
       setRetryingHubnet(order._id);
       const response = await axios.post(url, { force }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('igettoken')}` }
       });
-      applyHubnetState(order._id, response.data.hubnetState, response.data.lastError);
-      setUpdateSuccessMessage(`Order ${order.orderReference || order._id.substring(0, 8)} sent to Hubnet`);
+      if (isPortal) {
+        applySubmissionState(order._id, 'portalSubmission', { state: response.data.portalState });
+        setUpdateSuccessMessage(`Order ${ref} queued to resend through the portal — refresh in a few seconds`);
+      } else {
+        applySubmissionState(order._id, 'hubnetSubmission', { state: response.data.hubnetState, lastError: response.data.lastError }, true);
+        setUpdateSuccessMessage(`Order ${ref} sent to Hubnet`);
+      }
     } catch (err) {
       const data = err.response?.data;
       if (err.response?.status === 409 && data?.lastError !== undefined && !force) {
-        // Unclear last attempt: Hubnet may already have delivered it
+        // Unclear last attempt: the customer may already have the data
         if (window.confirm(`${data.message}\n\nLast error: ${data.lastError}\n\nResend anyway?`)) {
           setRetryingHubnet(null);
-          return handleHubnetRetry(order, true);
+          return handleHubnetRetry(order, true, provider);
         }
       } else {
-        if (data?.hubnetState) applyHubnetState(order._id, data.hubnetState, data.lastError);
-        setError(data?.message || 'Hubnet retry failed');
+        if (data?.hubnetState) {
+          applySubmissionState(order._id, 'hubnetSubmission', { state: data.hubnetState, lastError: data.lastError }, true);
+        }
+        setError(data?.message || 'Retry failed');
       }
     } finally {
       setRetryingHubnet(null);
     }
   };
 
-  const applyHubnetState = (orderId, state, lastError) => {
+  const applySubmissionState = (orderId, field, changes, countAttempt = false) => {
     const update = (list) => list.map(o => o._id === orderId
-      ? { ...o, hubnetSubmission: { ...o.hubnetSubmission, state, lastError, attempts: (o.hubnetSubmission?.attempts || 0) + 1 } }
+      ? { ...o, [field]: { ...o[field], ...changes, attempts: (o[field]?.attempts || 0) + (countAttempt ? 1 : 0) } }
       : o);
     setOrders(update);
     setFilteredOrders(update);
@@ -1444,6 +1469,15 @@ export default function OrdersManagement() {
                                 canRetry={order.status === 'pending'}
                                 retrying={retryingHubnet === order._id}
                                 onRetry={() => handleHubnetRetry(order)}
+                              />
+                            )}
+                            {order.portalSubmission?.state && (
+                              <HubnetSubmissionInfo
+                                provider="portal"
+                                submission={order.portalSubmission}
+                                canRetry={order.status === 'pending'}
+                                retrying={retryingHubnet === order._id}
+                                onRetry={() => handleHubnetRetry(order, false, 'portal')}
                               />
                             )}
                           </td>
