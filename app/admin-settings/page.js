@@ -32,7 +32,9 @@ export default function ApiSettingsPage() {
   useEffect(() => {
     const userData = localStorage.getItem('userData');
     const user = userData ? JSON.parse(userData) : null;
-    if (!user || !user.id || user.role !== 'admin') {
+    // userData may hold `id` (from login) or `_id` (refreshed via /api/user).
+    // The backend still enforces admin access on every request.
+    if (!user || !(user.id || user._id) || user.role !== 'admin') {
       router.push('/Signin');
       return;
     }
